@@ -1,1 +1,7 @@
 project_id = "oysfgyrtpdwokyvkjhcf"
+
+[functions.process-watermark]
+verify_jwt = false
+
+[functions.send-watermarked-files]
+verify_jwt = false

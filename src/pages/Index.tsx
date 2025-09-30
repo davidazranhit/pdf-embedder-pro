@@ -2,16 +2,29 @@ import { useState } from "react";
 import { FileUploadZone } from "@/components/FileUploadZone";
 import { FileList, FileItem } from "@/components/FileList";
 import { WatermarkForm } from "@/components/WatermarkForm";
+import { TemplateManager } from "@/components/TemplateManager";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { FileCheck, Send } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { FileCheck, Send, Download } from "lucide-react";
+
+interface Template {
+  id: string;
+  name: string;
+  file_path: string;
+  file_size: number;
+  created_at: string;
+}
 
 const Index = () => {
   const [files, setFiles] = useState<FileItem[]>([]);
+  const [selectedTemplates, setSelectedTemplates] = useState<Template[]>([]);
+  const [processedFiles, setProcessedFiles] = useState<string[]>([]);
   const [email, setEmail] = useState("");
   const [userId, setUserId] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const { toast } = useToast();
 
   const handleFilesSelected = (newFiles: File[]) => {
@@ -41,34 +54,144 @@ const Index = () => {
       return;
     }
 
-    if (files.length === 0) {
+    const totalItems = files.length + selectedTemplates.length;
+    if (totalItems === 0) {
       toast({
         title: "שגיאה",
-        description: "אנא העלה לפחות קובץ אחד",
+        description: "אנא העלה קבצים או בחר תבניות",
         variant: "destructive",
       });
       return;
     }
 
     setIsProcessing(true);
-    
-    // Simulate processing for now
-    toast({
-      title: "מעבד קבצים...",
-      description: "הקבצים בתהליך הטמעה",
-    });
+    setFiles((prev) => prev.map((f) => ({ ...f, status: "processing" as const })));
 
-    // TODO: Implement actual watermark processing with backend
-    setTimeout(() => {
-      setFiles((prev) =>
-        prev.map((f) => ({ ...f, status: "completed" as const }))
-      );
-      setIsProcessing(false);
+    try {
+      // Upload user files first
+      const uploadedFileIds: string[] = [];
+      for (const fileItem of files) {
+        const fileName = `uploads/${Date.now()}_${fileItem.file.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from("pdf-files")
+          .upload(fileName, fileItem.file);
+
+        if (uploadError) {
+          console.error("Upload error:", uploadError);
+          continue;
+        }
+        uploadedFileIds.push(fileName);
+      }
+
+      // Combine uploaded files with selected templates
+      const allFileIds = [
+        ...uploadedFileIds,
+        ...selectedTemplates.map((t) => t.file_path),
+      ];
+
+      // Process watermarks
+      const { data, error } = await supabase.functions.invoke("process-watermark", {
+        body: { fileIds: allFileIds, email, userId },
+      });
+
+      if (error) throw error;
+
+      const processed = data.files.map((f: any) => f.processedId);
+      setProcessedFiles(processed);
+      
+      setFiles((prev) => prev.map((f) => ({ ...f, status: "completed" as const })));
+      
       toast({
         title: "הושלם בהצלחה!",
-        description: "הקבצים עובדו והוטמעו בהצלחה",
+        description: `${processed.length} קבצים עובדו והוטמעו`,
       });
-    }, 2000);
+    } catch (error) {
+      console.error("Processing error:", error);
+      toast({
+        title: "שגיאה בעיבוד",
+        description: "אירעה שגיאה בעת עיבוד הקבצים",
+        variant: "destructive",
+      });
+      setFiles((prev) => prev.map((f) => ({ ...f, status: "error" as const })));
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (processedFiles.length === 0) {
+      toast({
+        title: "שגיאה",
+        description: "אין קבצים מעובדים לשליחה",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const { error } = await supabase.functions.invoke("send-watermarked-files", {
+        body: { email, fileIds: processedFiles },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "נשלח בהצלחה!",
+        description: `הקבצים נשלחו ל-${email}`,
+      });
+    } catch (error) {
+      console.error("Send error:", error);
+      toast({
+        title: "שגיאה בשליחה",
+        description: "לא ניתן לשלוח את הקבצים במייל",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleDownloadAll = async () => {
+    if (processedFiles.length === 0) {
+      toast({
+        title: "שגיאה",
+        description: "אין קבצים מעובדים להורדה",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      for (const filePath of processedFiles) {
+        const { data, error } = await supabase.storage
+          .from("pdf-files")
+          .download(filePath);
+
+        if (error) throw error;
+
+        const url = URL.createObjectURL(data);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filePath.split("/").pop() || "document.pdf";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
+      toast({
+        title: "הורדה החלה",
+        description: `מוריד ${processedFiles.length} קבצים`,
+      });
+    } catch (error) {
+      console.error("Download error:", error);
+      toast({
+        title: "שגיאה בהורדה",
+        description: "לא ניתן להוריד את הקבצים",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -104,10 +227,16 @@ const Index = () => {
                 />
               </div>
 
+              {/* Template Manager */}
+              <TemplateManager
+                onTemplateSelect={setSelectedTemplates}
+                selectedTemplates={selectedTemplates}
+              />
+
               {/* Upload Zone */}
               <div>
                 <h2 className="text-2xl font-semibold mb-6 text-foreground">
-                  העלאת קבצים
+                  העלאת קבצים נוספים
                 </h2>
                 <FileUploadZone onFilesSelected={handleFilesSelected} />
               </div>
@@ -118,12 +247,12 @@ const Index = () => {
               )}
 
               {/* Action Buttons */}
-              {files.length > 0 && (
-                <div className="flex gap-4 pt-4">
+              {(files.length > 0 || selectedTemplates.length > 0) && (
+                <div className="space-y-4">
                   <Button
                     onClick={handleProcess}
                     disabled={isProcessing || !email || !userId}
-                    className="flex-1 h-12 text-lg bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
+                    className="w-full h-12 text-lg bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
                   >
                     {isProcessing ? (
                       <>
@@ -137,14 +266,37 @@ const Index = () => {
                       </>
                     )}
                   </Button>
-                  <Button
-                    variant="outline"
-                    disabled={isProcessing}
-                    className="h-12"
-                  >
-                    <Send className="w-5 h-5 ml-2" />
-                    שלח למייל
-                  </Button>
+
+                  {processedFiles.length > 0 && (
+                    <div className="flex gap-4">
+                      <Button
+                        onClick={handleDownloadAll}
+                        variant="outline"
+                        className="flex-1 h-12"
+                      >
+                        <Download className="w-5 h-5 ml-2" />
+                        הורד קבצים
+                      </Button>
+                      <Button
+                        onClick={handleSendEmail}
+                        disabled={isSending}
+                        variant="outline"
+                        className="flex-1 h-12"
+                      >
+                        {isSending ? (
+                          <>
+                            <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin ml-2" />
+                            שולח...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-5 h-5 ml-2" />
+                            שלח למייל
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
