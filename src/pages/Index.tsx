@@ -32,7 +32,10 @@ const Index = () => {
     const fileItems: FileItem[] = newFiles.map((file) => ({
       file,
       id: Math.random().toString(36).substring(7),
+      name: file.name,
+      size: file.size,
       status: "pending" as const,
+      source: "upload" as const,
     }));
     setFiles((prev) => [...prev, ...fileItems]);
     toast({
@@ -41,12 +44,41 @@ const Index = () => {
     });
   };
 
+  const handleTemplateSelect = (templates: Template[]) => {
+    setSelectedTemplates(templates);
+    
+    // Remove old template files from the list
+    setFiles((prev) => prev.filter((f) => f.source !== "template"));
+    
+    // Add selected templates to files list
+    const templateFiles: FileItem[] = templates.map((template) => ({
+      id: template.id,
+      name: template.name,
+      size: template.file_size,
+      status: "pending" as const,
+      source: "template" as const,
+      templatePath: template.file_path,
+    }));
+    
+    setFiles((prev) => [...prev, ...templateFiles]);
+  };
+
+  const handleClearAll = () => {
+    setFiles([]);
+    setSelectedTemplates([]);
+    setProcessedFiles([]);
+    toast({
+      title: "רשימה נוקתה",
+      description: "כל הקבצים הוסרו מהרשימה",
+    });
+  };
+
   const handleRemoveFile = (id: string) => {
     setFiles((prev) => prev.filter((f) => f.id !== id));
   };
 
   const handleProcess = async () => {
-    console.log("handleProcess called", { email, userId, filesCount: files.length, templatesCount: selectedTemplates.length });
+    console.log("handleProcess called", { email, userId, filesCount: files.length });
     
     if (!email || !userId) {
       toast({
@@ -57,8 +89,7 @@ const Index = () => {
       return;
     }
 
-    const totalItems = files.length + selectedTemplates.length;
-    if (totalItems === 0) {
+    if (files.length === 0) {
       toast({
         title: "שגיאה",
         description: "אנא העלה קבצים או בחר תבניות",
@@ -71,29 +102,30 @@ const Index = () => {
     setFiles((prev) => prev.map((f) => ({ ...f, status: "processing" as const })));
 
     try {
-      // Upload user files first
-      const uploadedFileIds: string[] = [];
-      console.log("Starting file upload...");
+      const allFileIds: string[] = [];
+      
+      // Upload user files and collect template paths
+      console.log("Processing files...");
       for (const fileItem of files) {
-        const fileName = buildStoragePath('uploads', fileItem.file.name);
-        console.log("Uploading file:", fileName);
-        const { error: uploadError } = await supabase.storage
-          .from("pdf-files")
-          .upload(fileName, fileItem.file);
+        if (fileItem.source === "upload" && fileItem.file) {
+          // Upload user file
+          const fileName = buildStoragePath('uploads', fileItem.file.name);
+          console.log("Uploading file:", fileName);
+          const { error: uploadError } = await supabase.storage
+            .from("pdf-files")
+            .upload(fileName, fileItem.file);
 
-        if (uploadError) {
-          console.error("Upload error:", uploadError);
-          continue;
+          if (uploadError) {
+            console.error("Upload error:", uploadError);
+            continue;
+          }
+          allFileIds.push(fileName);
+        } else if (fileItem.source === "template" && fileItem.templatePath) {
+          // Use template path directly
+          allFileIds.push(fileItem.templatePath);
         }
-        uploadedFileIds.push(fileName);
       }
-      console.log("Uploaded files:", uploadedFileIds);
-
-      // Combine uploaded files with selected templates
-      const allFileIds = [
-        ...uploadedFileIds,
-        ...selectedTemplates.map((t) => t.file_path),
-      ];
+      
       console.log("All file IDs to process:", allFileIds);
 
       if (allFileIds.length === 0) {
@@ -249,7 +281,7 @@ const Index = () => {
 
               {/* Template Manager */}
               <TemplateManager
-                onTemplateSelect={setSelectedTemplates}
+                onTemplateSelect={handleTemplateSelect}
                 selectedTemplates={selectedTemplates}
               />
 
@@ -263,11 +295,15 @@ const Index = () => {
 
               {/* File List */}
               {files.length > 0 && (
-                <FileList files={files} onRemove={handleRemoveFile} />
+                <FileList 
+                  files={files} 
+                  onRemove={handleRemoveFile}
+                  onClearAll={handleClearAll}
+                />
               )}
 
               {/* Action Buttons */}
-              {(files.length > 0 || selectedTemplates.length > 0) && (
+              {files.length > 0 && (
                 <div className="space-y-4">
                   <Button
                     onClick={handleProcess}
