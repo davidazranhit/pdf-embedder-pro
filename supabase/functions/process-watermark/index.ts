@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import { PDFDocument, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
+import { PDFDocument, rgb, StandardFonts, degrees } from "https://esm.sh/pdf-lib@1.17.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,33 +51,40 @@ serve(async (req) => {
 
       for (const page of pages) {
         const { width, height } = page.getSize();
-        const fontSize = 12;
+        const fontSize = 24;
         const textWidth = font.widthOfTextAtSize(watermarkText, fontSize);
 
-        // Add watermark at bottom center
+        // Calculate center position
+        const centerX = width / 2;
+        const centerY = height / 2;
+
+        // Draw diagonal watermark in center
         page.drawText(watermarkText, {
-          x: (width - textWidth) / 2,
-          y: 30,
+          x: centerX - (textWidth / 2),
+          y: centerY,
           size: fontSize,
           font: font,
-          color: rgb(0.5, 0.5, 0.5),
-          opacity: 0.5,
+          color: rgb(0.7, 0.7, 0.7),
+          opacity: 0.3,
+          rotate: degrees(45),
         });
 
-        // Add watermark at top right
+        // Add small watermark at bottom
         page.drawText(watermarkText, {
-          x: width - textWidth - 20,
-          y: height - 30,
-          size: fontSize,
+          x: (width - font.widthOfTextAtSize(watermarkText, 10)) / 2,
+          y: 20,
+          size: 10,
           font: font,
           color: rgb(0.5, 0.5, 0.5),
           opacity: 0.5,
         });
       }
 
-      // Save processed PDF
+      // Save processed PDF with original name + userId
       const processedPdfBytes = await pdfDoc.save();
-      const processedFileName = `watermarked_${Date.now()}_${fileId.split('/').pop()}`;
+      const originalFileName = fileId.split('/').pop() || 'document.pdf';
+      const fileNameWithoutExt = originalFileName.replace(/\.pdf$/i, '');
+      const processedFileName = `${fileNameWithoutExt}_${userId}.pdf`;
 
       const { error: uploadError } = await supabase.storage
         .from("pdf-files")
@@ -107,7 +114,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error in process-watermark:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,

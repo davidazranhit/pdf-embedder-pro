@@ -222,10 +222,13 @@ const Index = () => {
 
         if (error) throw error;
 
+        // Extract the filename from the path (already includes userId)
+        const fileName = filePath.split("/").pop() || "document.pdf";
+
         const url = URL.createObjectURL(data);
         const a = document.createElement("a");
         a.href = url;
-        a.download = filePath.split("/").pop() || "document.pdf";
+        a.download = fileName;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
