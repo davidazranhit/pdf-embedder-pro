@@ -45,6 +45,8 @@ const Index = () => {
   };
 
   const handleProcess = async () => {
+    console.log("handleProcess called", { email, userId, filesCount: files.length, templatesCount: selectedTemplates.length });
+    
     if (!email || !userId) {
       toast({
         title: "שגיאה",
@@ -70,8 +72,10 @@ const Index = () => {
     try {
       // Upload user files first
       const uploadedFileIds: string[] = [];
+      console.log("Starting file upload...");
       for (const fileItem of files) {
         const fileName = `uploads/${Date.now()}_${fileItem.file.name}`;
+        console.log("Uploading file:", fileName);
         const { error: uploadError } = await supabase.storage
           .from("pdf-files")
           .upload(fileName, fileItem.file);
@@ -82,18 +86,22 @@ const Index = () => {
         }
         uploadedFileIds.push(fileName);
       }
+      console.log("Uploaded files:", uploadedFileIds);
 
       // Combine uploaded files with selected templates
       const allFileIds = [
         ...uploadedFileIds,
         ...selectedTemplates.map((t) => t.file_path),
       ];
+      console.log("All file IDs to process:", allFileIds);
 
       // Process watermarks
+      console.log("Invoking process-watermark function...");
       const { data, error } = await supabase.functions.invoke("process-watermark", {
         body: { fileIds: allFileIds, email, userId },
       });
 
+      console.log("Process watermark response:", { data, error });
       if (error) throw error;
 
       const processed = data.files.map((f: any) => f.processedId);
