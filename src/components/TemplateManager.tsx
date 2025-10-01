@@ -4,7 +4,7 @@ import { buildStoragePath } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, Trash2, Plus } from "lucide-react";
+import { Upload, FileText, Trash2, CheckCircle2, Circle } from "lucide-react";
 
 interface Template {
   id: string;
@@ -156,49 +156,53 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
             <p className="text-sm">העלה קובץ PDF להוספת תבנית</p>
           </div>
         ) : (
-          <div className="grid gap-3">
-            {templates.map((template) => {
-              const isSelected = selectedTemplates.some((t) => t.id === template.id);
-              return (
-                <div
-                  key={template.id}
-                  className={`flex items-center justify-between p-4 rounded-lg border transition-all cursor-pointer ${
-                    isSelected
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/50"
-                  }`}
-                  onClick={() => toggleTemplateSelection(template)}
-                >
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className="p-2 rounded bg-primary/10 text-primary">
-                      <FileText className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-foreground">{template.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {(template.file_size / 1024 / 1024).toFixed(2)} MB
-                      </p>
-                    </div>
-                    {isSelected && (
-                      <div className="mr-auto flex items-center gap-2 text-primary text-sm font-medium">
-                        <Plus className="w-4 h-4" />
-                        נבחר
-                      </div>
-                    )}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteTemplate(template);
-                    }}
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">לחץ על תבנית כדי לבחור אותה להטמעה</p>
+            <div className="grid gap-3">
+              {templates.map((template) => {
+                const isSelected = selectedTemplates.some((t) => t.id === template.id);
+                return (
+                  <div
+                    key={template.id}
+                    className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all cursor-pointer ${
+                      isSelected
+                        ? "border-primary bg-primary/10 shadow-sm"
+                        : "border-border hover:border-primary/50 hover:bg-accent/5"
+                    }`}
+                    onClick={() => toggleTemplateSelection(template)}
                   >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              );
-            })}
+                    <div className="flex items-center gap-3 flex-1">
+                      {isSelected ? (
+                        <CheckCircle2 className="w-6 h-6 text-primary flex-shrink-0" />
+                      ) : (
+                        <Circle className="w-6 h-6 text-muted-foreground flex-shrink-0" />
+                      )}
+                      <div className="p-2 rounded bg-primary/10 text-primary">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-foreground">{template.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {(template.file_size / 1024 / 1024).toFixed(2)} MB
+                          {isSelected && " • נבחר להטמעה"}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteTemplate(template);
+                      }}
+                      className="hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
