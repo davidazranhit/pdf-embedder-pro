@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { buildStoragePath } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -50,7 +51,7 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
 
     try {
       // Upload to storage
-      const fileName = `templates/${Date.now()}_${file.name}`;
+      const fileName = buildStoragePath('templates', file.name);
       const { error: uploadError } = await supabase.storage
         .from("pdf-files")
         .upload(fileName, file);

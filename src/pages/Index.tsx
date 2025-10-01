@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { buildStoragePath } from "@/lib/utils";
 import { FileCheck, Send, Download } from "lucide-react";
 
 interface Template {
@@ -74,7 +75,7 @@ const Index = () => {
       const uploadedFileIds: string[] = [];
       console.log("Starting file upload...");
       for (const fileItem of files) {
-        const fileName = `uploads/${Date.now()}_${fileItem.file.name}`;
+        const fileName = buildStoragePath('uploads', fileItem.file.name);
         console.log("Uploading file:", fileName);
         const { error: uploadError } = await supabase.storage
           .from("pdf-files")
@@ -94,6 +95,17 @@ const Index = () => {
         ...selectedTemplates.map((t) => t.file_path),
       ];
       console.log("All file IDs to process:", allFileIds);
+
+      if (allFileIds.length === 0) {
+        toast({
+          title: "שגיאה",
+          description: "לא נמצאו קבצים לעיבוד",
+          variant: "destructive",
+        });
+        setIsProcessing(false);
+        setFiles((prev) => prev.map((f) => ({ ...f, status: "error" as const })));
+        return;
+      }
 
       // Process watermarks
       console.log("Invoking process-watermark function...");
