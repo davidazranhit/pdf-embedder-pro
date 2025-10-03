@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.send-watermarked-files]
 verify_jwt = false
+
+[functions.cleanup-old-files]
+verify_jwt = false
