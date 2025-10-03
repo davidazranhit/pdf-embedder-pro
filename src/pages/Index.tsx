@@ -303,26 +303,28 @@ const Index = () => {
         return;
       }
 
-      // Create HTML email body with hyperlinks
-      const htmlBody = `<div dir="rtl" style="font-family: Arial, sans-serif; line-height: 1.8; color: #333;">
-<p style="margin-bottom: 20px;">שלום,</p>
-<p style="margin-bottom: 20px;">מצורפים הקבצים שלך בקורס הרלוונטי, על הקבצים מוטמעים הפרטים האישיים שלך, והם לשימוש אישי בלבד. כל שיתוף או העתקה של הקבצים יהווה הפרה של זכויות יוצרים ועלול לגרור השלכות.</p>
-<p style="margin-bottom: 10px;"><strong>קבצים להורדה (זמינים ל-3 ימים):</strong></p>
-<ul style="list-style: none; padding: 0;">
-${links.map((l) => {
-  // Extract just the course name without the userId suffix
-  const courseName = l.name.replace(/_\d+\.pdf$/, '');
-  return `<li style="margin-bottom: 10px;">• <a href="${l.url}" style="color: #0066cc; text-decoration: none;">${courseName}</a></li>`;
-}).join('\n')}
-</ul>
-<p style="margin-top: 20px;">בהצלחה!</p>
-</div>`;
+      // Create PLAIN TEXT email body (no HTML)
+      const bodyLines: string[] = [];
+      bodyLines.push("שלום,");
+      bodyLines.push("");
+      bodyLines.push("מצורפים הקבצים שלך בקורס הרלוונטי, על הקבצים מוטמעים הפרטים האישיים שלך, והם לשימוש אישי בלבד. כל שיתוף או העתקה של הקבצים יהווה הפרה של זכויות יוצרים ועלול לגרור השלכות.");
+      bodyLines.push("");
+      bodyLines.push("קבצים להורדה (זמינים ל-3 ימים):");
+      bodyLines.push("");
+      for (const l of links) {
+        const courseName = l.name.replace(/_\d+\.pdf$/, '').replace(/\.pdf$/i, '');
+        bodyLines.push(`• ${courseName}`);
+        bodyLines.push(`${l.url}`);
+        bodyLines.push("");
+      }
+      bodyLines.push("בהצלחה!");
+      const plainBody = bodyLines.join("\n");
 
-      // Create mailto link with HTML body
-      const mailtoLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent('קבצים מהקורס')}&body=${encodeURIComponent(htmlBody)}`;
+      // Create Gmail compose link with plain text body
+      const mailtoLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent("קבצים מהקורס")}&body=${encodeURIComponent(plainBody)}`;
 
       // Open Gmail in new tab
-      window.open(mailtoLink, '_blank');
+      window.open(mailtoLink, "_blank");
 
       toast({
         title: "מייל מוכן",
