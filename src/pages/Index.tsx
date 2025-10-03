@@ -304,16 +304,22 @@ const Index = () => {
       }
 
       // Create HTML email body with hyperlinks
-      const htmlBody = `<div dir="rtl">
-<p>הקבצים המוטמעים שלך מצורפים, שמור על הקבצים לשימוש אישי בלבד ואל תשתף אותם</p>
-<p>להורדה לחצו על הקישורים הבאים (זמינים ל-3 ימים):</p>
-<ul>
-${links.map((l) => `<li><a href="${l.url}">${l.name}</a></li>`).join('\n')}
+      const htmlBody = `<div dir="rtl" style="font-family: Arial, sans-serif; line-height: 1.8; color: #333;">
+<p style="margin-bottom: 20px;">שלום,</p>
+<p style="margin-bottom: 20px;">מצורפים הקבצים שלך בקורס הרלוונטי, על הקבצים מוטמעים הפרטים האישיים שלך, והם לשימוש אישי בלבד. כל שיתוף או העתקה של הקבצים יהווה הפרה של זכויות יוצרים ועלול לגרור השלכות.</p>
+<p style="margin-bottom: 10px;"><strong>קבצים להורדה (זמינים ל-3 ימים):</strong></p>
+<ul style="list-style: none; padding: 0;">
+${links.map((l) => {
+  // Extract just the course name without the userId suffix
+  const courseName = l.name.replace(/_\d+\.pdf$/, '');
+  return `<li style="margin-bottom: 10px;">• <a href="${l.url}" style="color: #0066cc; text-decoration: none;">${courseName}</a></li>`;
+}).join('\n')}
 </ul>
+<p style="margin-top: 20px;">בהצלחה!</p>
 </div>`;
 
       // Create mailto link with HTML body
-      const mailtoLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent('קבצים')}&body=${encodeURIComponent(htmlBody)}`;
+      const mailtoLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent('קבצים מהקורס')}&body=${encodeURIComponent(htmlBody)}`;
 
       // Open Gmail in new tab
       window.open(mailtoLink, '_blank');
