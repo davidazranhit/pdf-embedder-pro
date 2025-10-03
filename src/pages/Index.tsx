@@ -303,32 +303,30 @@ const Index = () => {
         return;
       }
 
-      // Create PLAIN TEXT email body (no HTML)
-      const bodyLines: string[] = [];
-      bodyLines.push("שלום,");
-      bodyLines.push("");
-      bodyLines.push("מצורפים הקבצים שלך בקורס הרלוונטי, על הקבצים מוטמעים הפרטים האישיים שלך, והם לשימוש אישי בלבד. כל שיתוף או העתקה של הקבצים יהווה הפרה של זכויות יוצרים ועלול לגרור השלכות.");
-      bodyLines.push("");
-      bodyLines.push("קבצים להורדה (זמינים ל-3 ימים):");
-      bodyLines.push("");
-      for (const l of links) {
-        const courseName = l.name.replace(/_\d+\.pdf$/, '').replace(/\.pdf$/i, '');
-        bodyLines.push(`• ${courseName}`);
-        bodyLines.push(`${l.url}`);
-        bodyLines.push("");
-      }
-      bodyLines.push("בהצלחה!");
-      const plainBody = bodyLines.join("\n");
+      // Create HTML email body with hyperlinks
+      const htmlBody = `<div dir="rtl">
+<p>שלום,</p>
+<p>מצורפים הקבצים שלך בקורס הרלוונטי, על הקבצים מוטמעים הפרטים האישיים שלך, והם לשימוש אישי בלבד. כל שיתוף או העתקה של הקבצים יהווה הפרה של זכויות יוצרים ועלול לגרור השלכות.</p>
+<p>קבצים להורדה (זמינים ל-3 ימים):</p>
+${links.map((l) => {
+  const courseName = l.name.replace(/_\d+\.pdf$/, '').replace(/\.pdf$/i, '');
+  return `<p>• <a href="${l.url}">${courseName}</a></p>`;
+}).join('\n')}
+<p>בהצלחה!</p>
+</div>`;
 
-      // Create Gmail compose link with plain text body
-      const mailtoLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent("קבצים מהקורס")}&body=${encodeURIComponent(plainBody)}`;
+      // Copy HTML to clipboard
+      const blob = new Blob([htmlBody], { type: 'text/html' });
+      const data = [new ClipboardItem({ 'text/html': blob })];
+      await navigator.clipboard.write(data);
 
-      // Open Gmail in new tab
+      // Open Gmail compose
+      const mailtoLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent("קבצים מהקורס")}`;
       window.open(mailtoLink, "_blank");
 
       toast({
         title: "מייל מוכן",
-        description: "Gmail נפתח עם המייל המוכן",
+        description: "Gmail נפתח והתוכן הועתק ללוח - הדבק בגוף המייל (Ctrl+V)",
       });
     } catch (error) {
       console.error("Manual email error:", error);
