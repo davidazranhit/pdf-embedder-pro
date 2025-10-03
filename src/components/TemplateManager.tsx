@@ -50,11 +50,13 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
     const file = files[0];
 
     try {
-      // Upload to storage
+      // Upload to storage (with upsert to allow overwriting existing files)
       const fileName = buildStoragePath('templates', file.name);
       const { error: uploadError } = await supabase.storage
         .from("pdf-files")
-        .upload(fileName, file);
+        .upload(fileName, file, {
+          upsert: true
+        });
 
       if (uploadError) throw uploadError;
 
