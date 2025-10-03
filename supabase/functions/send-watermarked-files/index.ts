@@ -18,11 +18,20 @@ serve(async (req) => {
   }
 
   try {
-    const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+    const apiKey = Deno.env.get("RESEND_API_KEY") ?? "";
+    const resend = new Resend(apiKey);
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
+
+    if (!apiKey) {
+      console.error("Missing RESEND_API_KEY secret");
+      return new Response(
+        JSON.stringify({ error: "Missing RESEND_API_KEY. Create one at https://resend.com/api-keys and add it as RESEND_API_KEY secret." }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
+    }
 
     const { email, fileIds }: SendEmailRequest = await req.json();
     console.log("Sending files to:", email, "Files:", fileIds);
@@ -48,6 +57,7 @@ serve(async (req) => {
       attachments.push({
         filename: fileName,
         content: base64Content,
+        encoding: "base64",
       });
     }
 
