@@ -52,13 +52,15 @@ serve(async (req) => {
       for (const page of pages) {
         const { width, height } = page.getSize();
         const fontSize = 24;
+        const smallFontSize = 10;
         const textWidth = font.widthOfTextAtSize(watermarkText, fontSize);
+        const smallTextWidth = font.widthOfTextAtSize(watermarkText, smallFontSize);
 
         // Calculate center position
         const centerX = width / 2;
         const centerY = height / 2;
 
-        // Draw diagonal watermark in center
+        // Draw diagonal watermark in center (large)
         page.drawText(watermarkText, {
           x: centerX - (textWidth / 2),
           y: centerY,
@@ -69,11 +71,21 @@ serve(async (req) => {
           rotate: degrees(45),
         });
 
-        // Add small watermark at bottom
+        // Add small watermark at top right
         page.drawText(watermarkText, {
-          x: (width - font.widthOfTextAtSize(watermarkText, 10)) / 2,
+          x: width - smallTextWidth - 20,
+          y: height - 30,
+          size: smallFontSize,
+          font: font,
+          color: rgb(0.5, 0.5, 0.5),
+          opacity: 0.5,
+        });
+
+        // Add small watermark at bottom left
+        page.drawText(watermarkText, {
+          x: 20,
           y: 20,
-          size: 10,
+          size: smallFontSize,
           font: font,
           color: rgb(0.5, 0.5, 0.5),
           opacity: 0.5,

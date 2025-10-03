@@ -250,6 +250,86 @@ const Index = () => {
     }
   };
 
+  const handleManualEmail = async () => {
+    if (processedFiles.length === 0) {
+      toast({
+        title: "שגיאה",
+        description: "אין קבצים מעובדים",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Create signed URLs for all files
+      const links: { name: string; url: string }[] = [];
+
+      for (const fileId of processedFiles) {
+        const processedFileName = fileId.split('/').pop() || 'document.pdf';
+        const fileNameWithoutUserId = processedFileName.replace(/_[^_]+\.pdf$/, '.pdf');
+        
+        const { data: templateData } = await supabase
+          .from('pdf_templates')
+          .select('name, file_path')
+          .ilike('file_path', `%${fileNameWithoutUserId}%`)
+          .maybeSingle();
+
+        let finalFileName = processedFileName;
+        if (templateData?.name) {
+          const userIdMatch = processedFileName.match(/_([^_]+)\.pdf$/);
+          const userIdPart = userIdMatch ? userIdMatch[1] : '';
+          const originalNameWithoutExt = templateData.name.replace(/\.pdf$/i, '');
+          finalFileName = userIdPart ? `${originalNameWithoutExt}_${userIdPart}.pdf` : templateData.name;
+        }
+
+        const { data: signed, error: signedError } = await supabase.storage
+          .from('pdf-files')
+          .createSignedUrl(fileId, 60 * 60 * 24 * 7);
+
+        if (signedError || !signed?.signedUrl) {
+          console.error('Error creating signed URL for', fileId, signedError);
+          continue;
+        }
+
+        links.push({ name: finalFileName, url: signed.signedUrl });
+      }
+
+      if (links.length === 0) {
+        toast({
+          title: "שגיאה",
+          description: "לא ניתן ליצור קישורים להורדה",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create email body
+      const emailBody = `הקבצים המוטמעים שלך מצורפים, שמור על הקבצים לשימוש אישי בלבד ואל תשתף אותם
+
+להורדה לחצו על הקישורים הבאים (זמינים ל-7 ימים):
+
+${links.map((l) => `${l.name}: ${l.url}`).join('\n\n')}`;
+
+      // Create mailto link
+      const mailtoLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent('קבצים')}&body=${encodeURIComponent(emailBody)}`;
+
+      // Open Gmail in new tab
+      window.open(mailtoLink, '_blank');
+
+      toast({
+        title: "מייל מוכן",
+        description: "Gmail נפתח עם המייל המוכן",
+      });
+    } catch (error) {
+      console.error("Manual email error:", error);
+      toast({
+        title: "שגיאה",
+        description: "לא ניתן להכין את המייל",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
       <div className="container mx-auto px-4 py-12">
@@ -328,33 +408,43 @@ const Index = () => {
                   </Button>
 
                   {processedFiles.length > 0 && (
-                    <div className="flex gap-4">
+                    <div className="space-y-3">
                       <Button
                         onClick={handleDownloadAll}
                         variant="outline"
-                        className="flex-1 h-12"
+                        className="w-full h-12"
                       >
                         <Download className="w-5 h-5 ml-2" />
                         הורד קבצים
                       </Button>
-                      <Button
-                        onClick={handleSendEmail}
-                        disabled={isSending}
-                        variant="outline"
-                        className="flex-1 h-12"
-                      >
-                        {isSending ? (
-                          <>
-                            <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin ml-2" />
-                            שולח...
-                          </>
-                        ) : (
-                          <>
-                            <Send className="w-5 h-5 ml-2" />
-                            שלח למייל
-                          </>
-                        )}
-                      </Button>
+                      <div className="flex gap-4">
+                        <Button
+                          onClick={handleSendEmail}
+                          disabled={isSending}
+                          variant="outline"
+                          className="flex-1 h-12"
+                        >
+                          {isSending ? (
+                            <>
+                              <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin ml-2" />
+                              שולח...
+                            </>
+                          ) : (
+                            <>
+                              <Send className="w-5 h-5 ml-2" />
+                              שלח אוטומטית
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          onClick={handleManualEmail}
+                          variant="outline"
+                          className="flex-1 h-12"
+                        >
+                          <Send className="w-5 h-5 ml-2" />
+                          שלח ידנית (Gmail)
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
