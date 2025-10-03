@@ -57,10 +57,10 @@ serve(async (req) => {
           finalFileName = userId ? `${originalNameWithoutExt}_${userId}.pdf` : templateData.name;
         }
 
-        // Create a signed URL valid for 7 days
+        // Create a signed URL valid for 3 days
         const { data: signed, error: signedError } = await supabase.storage
           .from('pdf-files')
-          .createSignedUrl(fileId, 60 * 60 * 24 * 7);
+          .createSignedUrl(fileId, 60 * 60 * 24 * 3);
         if (signedError || !signed?.signedUrl) {
           console.error('Error creating signed URL for', fileId, signedError);
           continue;
@@ -90,7 +90,7 @@ serve(async (req) => {
       html: `
         <div dir="rtl">
           <p>הקבצים המוטמעים שלך מצורפים, שמור על הקבצים לשימוש אישי בלבד ואל תשתף אותם</p>
-          <p>להורדה לחצו על הקישורים הבאים (זמינים ל-7 ימים):</p>
+          <p>להורדה לחצו על הקישורים הבאים (זמינים ל-3 ימים):</p>
           <ul>${listItems}</ul>
         </div>
       `,

@@ -56,18 +56,18 @@ serve(async (req) => {
         const textWidth = font.widthOfTextAtSize(watermarkText, fontSize);
         const smallTextWidth = font.widthOfTextAtSize(watermarkText, smallFontSize);
 
-        // Calculate center position
+        // Calculate center position - slightly lower for better centering
         const centerX = width / 2;
-        const centerY = height / 2;
+        const centerY = (height / 2) - 50;
 
-        // Draw diagonal watermark in center (large)
+        // Draw diagonal watermark in center (large, more transparent)
         page.drawText(watermarkText, {
           x: centerX - (textWidth / 2),
           y: centerY,
           size: fontSize,
           font: font,
           color: rgb(0.7, 0.7, 0.7),
-          opacity: 0.3,
+          opacity: 0.15,
           rotate: degrees(45),
         });
 

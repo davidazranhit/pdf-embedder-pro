@@ -284,7 +284,7 @@ const Index = () => {
 
         const { data: signed, error: signedError } = await supabase.storage
           .from('pdf-files')
-          .createSignedUrl(fileId, 60 * 60 * 24 * 7);
+          .createSignedUrl(fileId, 60 * 60 * 24 * 3);
 
         if (signedError || !signed?.signedUrl) {
           console.error('Error creating signed URL for', fileId, signedError);
@@ -303,15 +303,17 @@ const Index = () => {
         return;
       }
 
-      // Create email body
-      const emailBody = `הקבצים המוטמעים שלך מצורפים, שמור על הקבצים לשימוש אישי בלבד ואל תשתף אותם
+      // Create HTML email body with hyperlinks
+      const htmlBody = `<div dir="rtl">
+<p>הקבצים המוטמעים שלך מצורפים, שמור על הקבצים לשימוש אישי בלבד ואל תשתף אותם</p>
+<p>להורדה לחצו על הקישורים הבאים (זמינים ל-3 ימים):</p>
+<ul>
+${links.map((l) => `<li><a href="${l.url}">${l.name}</a></li>`).join('\n')}
+</ul>
+</div>`;
 
-להורדה לחצו על הקישורים הבאים (זמינים ל-7 ימים):
-
-${links.map((l) => `${l.name}: ${l.url}`).join('\n\n')}`;
-
-      // Create mailto link
-      const mailtoLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent('קבצים')}&body=${encodeURIComponent(emailBody)}`;
+      // Create mailto link with HTML body
+      const mailtoLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent('קבצים')}&body=${encodeURIComponent(htmlBody)}`;
 
       // Open Gmail in new tab
       window.open(mailtoLink, '_blank');
