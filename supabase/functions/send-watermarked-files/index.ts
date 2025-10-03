@@ -80,18 +80,25 @@ serve(async (req) => {
     }
 
     const listItems = links
-      .map((l) => `<li><a href="${l.url}" target="_blank">${l.name}</a></li>`) 
+      .map((l) => {
+        const courseName = l.name.replace(/_\d+\.pdf$/, '').replace(/\.pdf$/i, '');
+        return `<p style="margin: 8px 0;">• <a href="${l.url}" style="color: #0066cc; text-decoration: none;">${courseName}</a></p>`;
+      })
       .join('');
 
     const emailResponse = await resend.emails.send({
       from: 'Watermark System <onboarding@resend.dev>',
       to: [email],
-      subject: 'קבצים',
+      subject: 'קבצים מהקורס',
       html: `
-        <div dir="rtl">
-          <p>הקבצים המוטמעים שלך מצורפים, שמור על הקבצים לשימוש אישי בלבד ואל תשתף אותם</p>
-          <p>להורדה לחצו על הקישורים הבאים (זמינים ל-3 ימים):</p>
-          <ul>${listItems}</ul>
+        <div dir="rtl" style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px;">
+          <p style="margin-bottom: 16px;">שלום,</p>
+          <p style="margin-bottom: 16px;">מצורפים הקבצים שלך בקורס הרלוונטי, על הקבצים מוטמעים הפרטים האישיים שלך, והם לשימוש אישי בלבד. כל שיתוף או העתקה של הקבצים יהווה הפרה של זכויות יוצרים ועלול לגרור השלכות.</p>
+          <p style="margin-bottom: 12px; margin-top: 20px;"><strong>קבצים להורדה (זמינים ל-3 ימים):</strong></p>
+          <div style="margin-right: 20px;">
+            ${listItems}
+          </div>
+          <p style="margin-top: 20px;">בהצלחה!</p>
         </div>
       `,
     });
