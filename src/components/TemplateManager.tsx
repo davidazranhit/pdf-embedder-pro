@@ -27,6 +27,10 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
   const { toast } = useToast();
 
   const categories = ['בסיסי נתונים', 'מונחה עצמים', 'חישוביות וסיבוכיות'];
+  const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+  const toggleCategoryCollapse = (category: string) => {
+    setCollapsedCategories((prev) => ({ ...prev, [category]: !prev[category] }));
+  };
 
   useEffect(() => {
     fetchTemplates();
@@ -212,60 +216,72 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
                 <div key={category} className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="text-lg font-semibold text-foreground">{category}</h4>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => selectAllInCategory(category)}
-                    >
-                      {allSelected ? 'בטל בחירת הכל' : 'בחר הכל'}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleCategoryCollapse(category)}
+                      >
+                        {collapsedCategories[category] ? 'הצג' : 'מזער'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => selectAllInCategory(category)}
+                      >
+                        {allSelected ? 'בטל בחירת הכל' : 'בחר הכל'}
+                      </Button>
+                    </div>
                   </div>
                   
-                  <div className="grid gap-3">
-                    {categoryTemplates.map((template) => {
-                      const isSelected = selectedTemplates.some((t) => t.id === template.id);
-                      return (
-                        <div
-                          key={template.id}
-                          className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all cursor-pointer ${
-                            isSelected
-                              ? "border-primary bg-primary/10 shadow-sm"
-                              : "border-border hover:border-primary/50 hover:bg-accent/5"
-                          }`}
-                          onClick={() => toggleTemplateSelection(template)}
-                        >
-                          <div className="flex items-center gap-3 flex-1">
-                            {isSelected ? (
-                              <CheckCircle2 className="w-6 h-6 text-primary flex-shrink-0" />
-                            ) : (
-                              <Circle className="w-6 h-6 text-muted-foreground flex-shrink-0" />
-                            )}
-                            <div className="p-2 rounded bg-primary/10 text-primary">
-                              <FileText className="w-5 h-5" />
-                            </div>
-                            <div className="flex-1">
-                              <p className="font-medium text-foreground">{template.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {(template.file_size / 1024 / 1024).toFixed(2)} MB
-                                {isSelected && " • נבחר להטמעה"}
-                              </p>
-                            </div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteTemplate(template);
-                            }}
-                            className="hover:bg-destructive/10 hover:text-destructive"
+                  {!collapsedCategories[category] && (
+                    <div className="grid gap-3 animate-fade-in">
+                      {categoryTemplates.map((template) => {
+                        const isSelected = selectedTemplates.some((t) => t.id === template.id);
+                        return (
+                          <div
+                            key={template.id}
+                            className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all cursor-pointer ${
+                              isSelected
+                                ? "border-primary bg-primary/10 shadow-sm"
+                                : "border-border hover:border-primary/50 hover:bg-accent/5"
+                            }`}
+                            onClick={() => toggleTemplateSelection(template)}
                           >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
+                            <div className="flex items-center gap-3 flex-1">
+                              {isSelected ? (
+                                <CheckCircle2 className="w-6 h-6 text-primary flex-shrink-0" />
+                              ) : (
+                                <Circle className="w-6 h-6 text-muted-foreground flex-shrink-0" />
+                              )}
+                              <div className="p-2 rounded bg-primary/10 text-primary">
+                                <FileText className="w-5 h-5" />
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-medium text-foreground">{template.name}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {(template.file_size / 1024 / 1024).toFixed(2)} MB
+                                  {isSelected && " • נבחר להטמעה"}
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteTemplate(template);
+                              }}
+                              className="hover:bg-destructive/10 hover:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
                 </div>
               );
             })}
