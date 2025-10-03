@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Sanitize file names for storage keys (ASCII-only, safe characters)
+// Sanitize file names for storage keys (keep original name, only remove unsafe characters)
 export function sanitizeFileName(name: string) {
   const extMatch = name.match(/\.([A-Za-z0-9]+)$/);
   const ext = extMatch ? `.${extMatch[1].toLowerCase()}` : '';
@@ -13,11 +13,10 @@ export function sanitizeFileName(name: string) {
   // Normalize and strip diacritics, then replace non-safe chars
   const ascii = base.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
   const safe = ascii
-    .replace(/[^a-zA-Z0-9-_]+/g, '-')
+    .replace(/[^a-zA-Z0-9-_\u0590-\u05FF]+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
-  const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  return `${safe || 'file'}-${unique}${ext || '.pdf'}`;
+  return `${safe || 'file'}${ext || '.pdf'}`;
 }
 
 export function buildStoragePath(folder: string, originalName: string) {

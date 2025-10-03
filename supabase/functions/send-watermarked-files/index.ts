@@ -64,13 +64,10 @@ serve(async (req) => {
     const emailResponse = await resend.emails.send({
       from: "Watermark System <onboarding@resend.dev>",
       to: [email],
-      subject: "קבצי PDF מוטמעים שלך",
+      subject: "קבצים",
       html: `
         <div dir="rtl">
-          <h1>הקבצים המוטמעים שלך מוכנים!</h1>
-          <p>שלום,</p>
-          <p>צירפנו ${attachments.length} קבצי PDF מוטמעים למייל זה.</p>
-          <p>בברכה,<br>מערכת ההטמעה</p>
+          <p>הקבצים המוטמעים שלך מצורפים, שמור על הקבצים לשימוש אישי בלבד ואל תשתף אותם</p>
         </div>
       `,
       attachments: attachments,
