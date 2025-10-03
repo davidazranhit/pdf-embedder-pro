@@ -66,8 +66,8 @@ serve(async (req) => {
           y: centerY,
           size: fontSize,
           font: font,
-          color: rgb(0.7, 0.7, 0.7),
-          opacity: 0.15,
+          color: rgb(0.6, 0.6, 0.6),
+          opacity: 0.25,
           rotate: degrees(45),
         });
 
