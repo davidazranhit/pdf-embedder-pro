@@ -48,14 +48,35 @@ serve(async (req) => {
         continue;
       }
 
-      const fileName = fileId.split('/').pop() || 'document.pdf';
+      // Extract the processed file name to get the userId suffix
+      const processedFileName = fileId.split('/').pop() || 'document.pdf';
+      
+      // Get the original file path from the processed file name
+      // Format: originalname_userId.pdf -> we need to find the original template
+      const fileNameWithoutUserId = processedFileName.replace(/_[^_]+\.pdf$/, '.pdf');
+      
+      // Query the database to get the original name
+      const { data: templateData } = await supabase
+        .from('pdf_templates')
+        .select('name, file_path')
+        .ilike('file_path', `%${fileNameWithoutUserId}%`)
+        .single();
+      
+      // Use original name with userId suffix for the email attachment
+      let finalFileName = processedFileName;
+      if (templateData?.name) {
+        const userId = processedFileName.match(/_([^_]+)\.pdf$/)?.[1] || '';
+        const originalNameWithoutExt = templateData.name.replace(/\.pdf$/i, '');
+        finalFileName = userId ? `${originalNameWithoutExt}_${userId}.pdf` : templateData.name;
+      }
+
       const fileBuffer = await fileData.arrayBuffer();
       const base64Content = btoa(
         new Uint8Array(fileBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
       );
 
       attachments.push({
-        filename: fileName,
+        filename: finalFileName,
         content: base64Content,
         contentType: "application/pdf",
       });
