@@ -36,122 +36,70 @@ serve(async (req) => {
     const { email, fileIds }: SendEmailRequest = await req.json();
     console.log("Sending files to:", email, "Files:", fileIds);
 
-    // Process files in smaller batches to avoid memory limits
-    const MAX_BATCH_SIZE = 8_000_000;  // 8MB per email (conservative for edge functions)
-    const MAX_FILES_PER_BATCH = 3;      // Process only 3 files at a time
-    
-    const sendResults = [] as any[];
-    let batchNumber = 0;
-    
-    // Process files one by one, grouping into small batches
-    for (let i = 0; i < fileIds.length; i += MAX_FILES_PER_BATCH) {
-      const batchFileIds = fileIds.slice(i, i + MAX_FILES_PER_BATCH);
-      const attachments = [];
-      let batchSize = 0;
+    // Build signed download links instead of attaching files to avoid memory limits
+    const links: { name: string; url: string }[] = [];
 
-      for (const fileId of batchFileIds) {
-        try {
-          const { data: fileData, error: downloadError } = await supabase.storage
-            .from("pdf-files")
-            .download(fileId);
+    for (const fileId of fileIds) {
+      try {
+        // Derive final (Hebrew) file name
+        const processedFileName = fileId.split('/').pop() || 'document.pdf';
+        const fileNameWithoutUserId = processedFileName.replace(/_[^_]+\.pdf$/, '.pdf');
+        const { data: templateData } = await supabase
+          .from('pdf_templates')
+          .select('name, file_path')
+          .ilike('file_path', `%${fileNameWithoutUserId}%`)
+          .maybeSingle();
 
-          if (downloadError) {
-            console.error("Error downloading file:", downloadError);
-            continue;
-          }
-
-          // Extract the processed file name
-          const processedFileName = fileId.split('/').pop() || 'document.pdf';
-          const fileNameWithoutUserId = processedFileName.replace(/_[^_]+\.pdf$/, '.pdf');
-          
-          // Query the database for original name
-          const { data: templateData } = await supabase
-            .from('pdf_templates')
-            .select('name, file_path')
-            .ilike('file_path', `%${fileNameWithoutUserId}%`)
-            .maybeSingle();
-          
-          // Build final file name with original Hebrew name + userId
-          let finalFileName = processedFileName;
-          if (templateData?.name) {
-            const userId = processedFileName.match(/_([^_]+)\.pdf$/)?.[1] || '';
-            const originalNameWithoutExt = templateData.name.replace(/\.pdf$/i, '');
-            finalFileName = userId ? `${originalNameWithoutExt}_${userId}.pdf` : templateData.name;
-          }
-
-          const arrayBuffer = await fileData.arrayBuffer();
-          const byteLength = arrayBuffer.byteLength;
-          
-          // Skip files that would exceed batch size limit alone
-          if (byteLength > MAX_BATCH_SIZE) {
-            console.warn(`File ${finalFileName} too large (${byteLength} bytes), skipping`);
-            continue;
-          }
-          
-          // If adding this file would exceed batch size, send current batch first
-          if (batchSize + byteLength > MAX_BATCH_SIZE && attachments.length > 0) {
-            batchNumber++;
-            const totalBatches = Math.ceil(fileIds.length / MAX_FILES_PER_BATCH);
-            const emailResponse = await resend.emails.send({
-              from: "Watermark System <onboarding@resend.dev>",
-              to: [email],
-              subject: "קבצים",
-              html: `
-                <div dir="rtl">
-                  <p>הקבצים המוטמעים שלך מצורפים, שמור על הקבצים לשימוש אישי בלבד ואל תשתף אותם</p>
-                  ${totalBatches > 1 ? `<p>חלק ${batchNumber} מתוך ${totalBatches}</p>` : ''}
-                </div>
-              `,
-              attachments: attachments,
-            });
-            console.log(`Batch ${batchNumber} sent:`, emailResponse);
-            sendResults.push(emailResponse);
-            
-            // Reset for next batch
-            attachments.length = 0;
-            batchSize = 0;
-          }
-
-          // Convert to base64 and add to current batch
-          const base64Content = btoa(
-            new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-          );
-          
-          attachments.push({
-            filename: finalFileName,
-            content: base64Content,
-            contentType: "application/pdf",
-          });
-          batchSize += byteLength;
-          
-        } catch (error) {
-          console.error(`Error processing file ${fileId}:`, error);
+        let finalFileName = processedFileName;
+        if (templateData?.name) {
+          const userId = processedFileName.match(/_([^_]+)\.pdf$/)?.[1] || '';
+          const originalNameWithoutExt = templateData.name.replace(/\.pdf$/i, '');
+          finalFileName = userId ? `${originalNameWithoutExt}_${userId}.pdf` : templateData.name;
         }
-      }
 
-      // Send remaining attachments in this batch
-      if (attachments.length > 0) {
-        batchNumber++;
-        const totalBatches = Math.ceil(fileIds.length / MAX_FILES_PER_BATCH);
-        const emailResponse = await resend.emails.send({
-          from: "Watermark System <onboarding@resend.dev>",
-          to: [email],
-          subject: "קבצים",
-          html: `
-            <div dir="rtl">
-              <p>הקבצים המוטמעים שלך מצורפים, שמור על הקבצים לשימוש אישי בלבד ואל תשתף אותם</p>
-              ${totalBatches > 1 ? `<p>חלק ${batchNumber} מתוך ${totalBatches}</p>` : ''}
-            </div>
-          `,
-          attachments: attachments,
-        });
-        console.log(`Batch ${batchNumber} sent:`, emailResponse);
-        sendResults.push(emailResponse);
+        // Create a signed URL valid for 7 days
+        const { data: signed, error: signedError } = await supabase.storage
+          .from('pdf-files')
+          .createSignedUrl(fileId, 60 * 60 * 24 * 7);
+        if (signedError || !signed?.signedUrl) {
+          console.error('Error creating signed URL for', fileId, signedError);
+          continue;
+        }
+
+        links.push({ name: finalFileName, url: signed.signedUrl });
+      } catch (err) {
+        console.error('Error preparing link for', fileId, err);
       }
     }
 
-    return new Response(JSON.stringify({ success: true, results: sendResults, emailResponse: sendResults[0] }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (links.length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'No files available to send' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+
+    const listItems = links
+      .map((l) => `<li><a href="${l.url}" target="_blank">${l.name}</a></li>`) 
+      .join('');
+
+    const emailResponse = await resend.emails.send({
+      from: 'Watermark System <onboarding@resend.dev>',
+      to: [email],
+      subject: 'קבצים',
+      html: `
+        <div dir="rtl">
+          <p>הקבצים המוטמעים שלך מצורפים, שמור על הקבצים לשימוש אישי בלבד ואל תשתף אותם</p>
+          <p>להורדה לחצו על הקישורים הבאים (זמינים ל-7 ימים):</p>
+          <ul>${listItems}</ul>
+        </div>
+      `,
+    });
+
+    console.log('Email with links sent successfully:', emailResponse);
+
+    return new Response(JSON.stringify({ success: true, emailResponse }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
   } catch (error) {

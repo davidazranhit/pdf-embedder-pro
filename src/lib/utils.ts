@@ -8,7 +8,7 @@ export function cn(...inputs: ClassValue[]) {
 // Sanitize file names for storage keys (ASCII-only, safe characters)
 export function sanitizeFileName(name: string) {
   const extMatch = name.match(/\.([A-Za-z0-9]+)$/);
-  const ext = extMatch ? `.${extMatch[1].toLowerCase()}` : '';
+  const ext = extMatch ? `.${extMatch[1].toLowerCase()}` : '.pdf';
   const base = name.replace(/\.[^/.]+$/, "");
   // Normalize and strip diacritics, then replace non-ASCII chars with dash
   const ascii = base.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
@@ -16,7 +16,12 @@ export function sanitizeFileName(name: string) {
     .replace(/[^a-zA-Z0-9-_]+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
-  return `${safe || 'file'}${ext || '.pdf'}`;
+  // If name becomes empty (e.g. Hebrew-only), make it unique to avoid collisions
+  if (!safe) {
+    const unique = Math.random().toString(36).slice(2, 8);
+    return `file-${unique}${ext}`;
+  }
+  return `${safe}${ext}`;
 }
 
 export function buildStoragePath(folder: string, originalName: string) {
