@@ -291,7 +291,12 @@ const Index = () => {
           continue;
         }
 
-        links.push({ name: finalFileName, url: signed.signedUrl });
+        // Ensure the URL is absolute
+        const signedUrl = signed.signedUrl.startsWith('http') 
+          ? signed.signedUrl 
+          : `${import.meta.env.VITE_SUPABASE_URL}/storage/v1${signed.signedUrl}`;
+
+        links.push({ name: finalFileName, url: signedUrl });
       }
 
       if (links.length === 0) {

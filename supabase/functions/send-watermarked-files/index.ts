@@ -66,7 +66,12 @@ serve(async (req) => {
           continue;
         }
 
-        links.push({ name: finalFileName, url: signed.signedUrl });
+        // Ensure the URL is absolute
+        const signedUrl = signed.signedUrl.startsWith('http') 
+          ? signed.signedUrl 
+          : `${Deno.env.get("SUPABASE_URL")}/storage/v1${signed.signedUrl}`;
+
+        links.push({ name: finalFileName, url: signedUrl });
       } catch (err) {
         console.error('Error preparing link for', fileId, err);
       }
