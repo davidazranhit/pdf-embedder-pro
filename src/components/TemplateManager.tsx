@@ -12,6 +12,7 @@ interface Template {
   file_path: string;
   file_size: number;
   created_at: string;
+  category: string;
 }
 
 interface TemplateManagerProps {
@@ -22,7 +23,10 @@ interface TemplateManagerProps {
 export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: TemplateManagerProps) => {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('בסיסי נתונים');
   const { toast } = useToast();
+
+  const categories = ['בסיסי נתונים', 'מונחה עצמים', 'חישוביות וסיבוכיות'];
 
   useEffect(() => {
     fetchTemplates();
@@ -67,6 +71,7 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
           name: file.name,
           file_path: fileName,
           file_size: file.size,
+          category: selectedCategory,
         });
 
       if (dbError) throw dbError;
@@ -131,11 +136,47 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
     }
   };
 
+  const selectAllInCategory = (category: string) => {
+    const categoryTemplates = templates.filter(t => t.category === category);
+    const allSelected = categoryTemplates.every(t => selectedTemplates.some(st => st.id === t.id));
+    
+    if (allSelected) {
+      // Deselect all in category
+      onTemplateSelect(selectedTemplates.filter(t => t.category !== category));
+    } else {
+      // Select all in category
+      const newSelections = [...selectedTemplates];
+      categoryTemplates.forEach(t => {
+        if (!newSelections.some(st => st.id === t.id)) {
+          newSelections.push(t);
+        }
+      });
+      onTemplateSelect(newSelections);
+    }
+  };
+
+  const groupedTemplates = categories.reduce((acc, category) => {
+    acc[category] = templates.filter(t => t.category === category);
+    return acc;
+  }, {} as Record<string, Template[]>);
+
   return (
     <Card className="p-6">
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-xl font-semibold text-foreground">תבניות PDF מוכנות</h3>
+        </div>
+        
+        <div className="flex items-center gap-4">
+          <select 
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="px-3 py-2 border rounded-lg bg-background"
+          >
+            {categories.map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
           <div className="relative">
             <input
               type="file"
@@ -158,53 +199,76 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
             <p className="text-sm">העלה קובץ PDF להוספת תבנית</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">לחץ על תבנית כדי לבחור אותה להטמעה</p>
-            <div className="grid gap-3">
-              {templates.map((template) => {
-                const isSelected = selectedTemplates.some((t) => t.id === template.id);
-                return (
-                  <div
-                    key={template.id}
-                    className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all cursor-pointer ${
-                      isSelected
-                        ? "border-primary bg-primary/10 shadow-sm"
-                        : "border-border hover:border-primary/50 hover:bg-accent/5"
-                    }`}
-                    onClick={() => toggleTemplateSelection(template)}
-                  >
-                    <div className="flex items-center gap-3 flex-1">
-                      {isSelected ? (
-                        <CheckCircle2 className="w-6 h-6 text-primary flex-shrink-0" />
-                      ) : (
-                        <Circle className="w-6 h-6 text-muted-foreground flex-shrink-0" />
-                      )}
-                      <div className="p-2 rounded bg-primary/10 text-primary">
-                        <FileText className="w-5 h-5" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-foreground">{template.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {(template.file_size / 1024 / 1024).toFixed(2)} MB
-                          {isSelected && " • נבחר להטמעה"}
-                        </p>
-                      </div>
-                    </div>
+          <div className="space-y-6">
+            <p className="text-sm text-muted-foreground">לחץ על תבנית כדי לבחור אותה או בחר תיקייה שלמה</p>
+            
+            {categories.map(category => {
+              const categoryTemplates = groupedTemplates[category] || [];
+              if (categoryTemplates.length === 0) return null;
+              
+              const allSelected = categoryTemplates.every(t => selectedTemplates.some(st => st.id === t.id));
+              
+              return (
+                <div key={category} className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-lg font-semibold text-foreground">{category}</h4>
                     <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteTemplate(template);
-                      }}
-                      className="hover:bg-destructive/10 hover:text-destructive"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => selectAllInCategory(category)}
                     >
-                      <Trash2 className="w-4 h-4" />
+                      {allSelected ? 'בטל בחירת הכל' : 'בחר הכל'}
                     </Button>
                   </div>
-                );
-              })}
-            </div>
+                  
+                  <div className="grid gap-3">
+                    {categoryTemplates.map((template) => {
+                      const isSelected = selectedTemplates.some((t) => t.id === template.id);
+                      return (
+                        <div
+                          key={template.id}
+                          className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all cursor-pointer ${
+                            isSelected
+                              ? "border-primary bg-primary/10 shadow-sm"
+                              : "border-border hover:border-primary/50 hover:bg-accent/5"
+                          }`}
+                          onClick={() => toggleTemplateSelection(template)}
+                        >
+                          <div className="flex items-center gap-3 flex-1">
+                            {isSelected ? (
+                              <CheckCircle2 className="w-6 h-6 text-primary flex-shrink-0" />
+                            ) : (
+                              <Circle className="w-6 h-6 text-muted-foreground flex-shrink-0" />
+                            )}
+                            <div className="p-2 rounded bg-primary/10 text-primary">
+                              <FileText className="w-5 h-5" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-medium text-foreground">{template.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {(template.file_size / 1024 / 1024).toFixed(2)} MB
+                                {isSelected && " • נבחר להטמעה"}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteTemplate(template);
+                            }}
+                            className="hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

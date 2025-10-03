@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       pdf_templates: {
         Row: {
+          category: string
           created_at: string | null
           file_path: string
           file_size: number
@@ -24,6 +25,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          category?: string
           created_at?: string | null
           file_path: string
           file_size: number
@@ -32,6 +34,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          category?: string
           created_at?: string | null
           file_path?: string
           file_size?: number

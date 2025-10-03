@@ -16,6 +16,7 @@ interface Template {
   file_path: string;
   file_size: number;
   created_at: string;
+  category: string;
 }
 
 const Index = () => {
