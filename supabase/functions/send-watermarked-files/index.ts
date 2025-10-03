@@ -36,86 +36,118 @@ serve(async (req) => {
     const { email, fileIds }: SendEmailRequest = await req.json();
     console.log("Sending files to:", email, "Files:", fileIds);
 
-    // Batch attachments to avoid provider limits (size/count)
-    const MAX_TOTAL_BYTES = 20_000_000; // ~20MB safety limit
-    const MAX_FILES_PER_EMAIL = 10;     // safety cap
-
-    const attachments: Array<{ filename: string; content: string; contentType: string; size: number }>[] = [];
-    let currentBatch: Array<{ filename: string; content: string; contentType: string; size: number }> = [];
-    let currentBatchSize = 0;
-
-    for (const fileId of fileIds) {
-      const { data: fileData, error: downloadError } = await supabase.storage
-        .from("pdf-files")
-        .download(fileId);
-
-      if (downloadError) {
-        console.error("Error downloading file:", downloadError);
-        continue;
-      }
-
-      // Extract the processed file name to get the userId suffix
-      const processedFileName = fileId.split('/').pop() || 'document.pdf';
-      
-      // Get the original file path from the processed file name
-      // Format: originalname_userId.pdf -> we need to find the original template
-      const fileNameWithoutUserId = processedFileName.replace(/_[^_]+\.pdf$/, '.pdf');
-      
-      // Query the database to get the original name
-      const { data: templateData } = await supabase
-        .from('pdf_templates')
-        .select('name, file_path')
-        .ilike('file_path', `%${fileNameWithoutUserId}%`)
-        .maybeSingle();
-      
-      // Use original name with userId suffix for the email attachment
-      let finalFileName = processedFileName;
-      if (templateData?.name) {
-        const userId = processedFileName.match(/_([^_]+)\.pdf$/)?.[1] || '';
-        const originalNameWithoutExt = templateData.name.replace(/\.pdf$/i, '');
-        finalFileName = userId ? `${originalNameWithoutExt}_${userId}.pdf` : templateData.name;
-      }
-
-      const arrayBuffer = await fileData.arrayBuffer();
-      const byteLength = arrayBuffer.byteLength;
-      const base64Content = btoa(
-        new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-      );
-
-      // If adding this file would exceed limits, start a new batch
-      const wouldExceedSize = currentBatchSize + byteLength > MAX_TOTAL_BYTES;
-      const wouldExceedCount = currentBatch.length + 1 > MAX_FILES_PER_EMAIL;
-      if (currentBatch.length > 0 && (wouldExceedSize || wouldExceedCount)) {
-        attachments.push(currentBatch);
-        currentBatch = [];
-        currentBatchSize = 0;
-      }
-
-      currentBatch.push({ filename: finalFileName, content: base64Content, contentType: "application/pdf", size: byteLength });
-      currentBatchSize += byteLength;
-    }
-
-    if (currentBatch.length > 0) {
-      attachments.push(currentBatch);
-    }
-
+    // Process files in smaller batches to avoid memory limits
+    const MAX_BATCH_SIZE = 8_000_000;  // 8MB per email (conservative for edge functions)
+    const MAX_FILES_PER_BATCH = 3;      // Process only 3 files at a time
+    
     const sendResults = [] as any[];
-    for (let i = 0; i < attachments.length; i++) {
-      const batch = attachments[i];
-      const emailResponse = await resend.emails.send({
-        from: "Watermark System <onboarding@resend.dev>",
-        to: [email],
-        subject: "קבצים",
-        html: `
-          <div dir="rtl">
-            <p>הקבצים המוטמעים שלך מצורפים, שמור על הקבצים לשימוש אישי בלבד ואל תשתף אותם</p>
-            ${attachments.length > 1 ? `<p>מייל ${i + 1} מתוך ${attachments.length}</p>` : ''}
-          </div>
-        `,
-        attachments: batch.map(({ size, ...rest }) => rest),
-      });
-      console.log(`Email batch ${i + 1}/${attachments.length} sent:`, emailResponse);
-      sendResults.push(emailResponse);
+    let batchNumber = 0;
+    
+    // Process files one by one, grouping into small batches
+    for (let i = 0; i < fileIds.length; i += MAX_FILES_PER_BATCH) {
+      const batchFileIds = fileIds.slice(i, i + MAX_FILES_PER_BATCH);
+      const attachments = [];
+      let batchSize = 0;
+
+      for (const fileId of batchFileIds) {
+        try {
+          const { data: fileData, error: downloadError } = await supabase.storage
+            .from("pdf-files")
+            .download(fileId);
+
+          if (downloadError) {
+            console.error("Error downloading file:", downloadError);
+            continue;
+          }
+
+          // Extract the processed file name
+          const processedFileName = fileId.split('/').pop() || 'document.pdf';
+          const fileNameWithoutUserId = processedFileName.replace(/_[^_]+\.pdf$/, '.pdf');
+          
+          // Query the database for original name
+          const { data: templateData } = await supabase
+            .from('pdf_templates')
+            .select('name, file_path')
+            .ilike('file_path', `%${fileNameWithoutUserId}%`)
+            .maybeSingle();
+          
+          // Build final file name with original Hebrew name + userId
+          let finalFileName = processedFileName;
+          if (templateData?.name) {
+            const userId = processedFileName.match(/_([^_]+)\.pdf$/)?.[1] || '';
+            const originalNameWithoutExt = templateData.name.replace(/\.pdf$/i, '');
+            finalFileName = userId ? `${originalNameWithoutExt}_${userId}.pdf` : templateData.name;
+          }
+
+          const arrayBuffer = await fileData.arrayBuffer();
+          const byteLength = arrayBuffer.byteLength;
+          
+          // Skip files that would exceed batch size limit alone
+          if (byteLength > MAX_BATCH_SIZE) {
+            console.warn(`File ${finalFileName} too large (${byteLength} bytes), skipping`);
+            continue;
+          }
+          
+          // If adding this file would exceed batch size, send current batch first
+          if (batchSize + byteLength > MAX_BATCH_SIZE && attachments.length > 0) {
+            batchNumber++;
+            const totalBatches = Math.ceil(fileIds.length / MAX_FILES_PER_BATCH);
+            const emailResponse = await resend.emails.send({
+              from: "Watermark System <onboarding@resend.dev>",
+              to: [email],
+              subject: "קבצים",
+              html: `
+                <div dir="rtl">
+                  <p>הקבצים המוטמעים שלך מצורפים, שמור על הקבצים לשימוש אישי בלבד ואל תשתף אותם</p>
+                  ${totalBatches > 1 ? `<p>חלק ${batchNumber} מתוך ${totalBatches}</p>` : ''}
+                </div>
+              `,
+              attachments: attachments,
+            });
+            console.log(`Batch ${batchNumber} sent:`, emailResponse);
+            sendResults.push(emailResponse);
+            
+            // Reset for next batch
+            attachments.length = 0;
+            batchSize = 0;
+          }
+
+          // Convert to base64 and add to current batch
+          const base64Content = btoa(
+            new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+          );
+          
+          attachments.push({
+            filename: finalFileName,
+            content: base64Content,
+            contentType: "application/pdf",
+          });
+          batchSize += byteLength;
+          
+        } catch (error) {
+          console.error(`Error processing file ${fileId}:`, error);
+        }
+      }
+
+      // Send remaining attachments in this batch
+      if (attachments.length > 0) {
+        batchNumber++;
+        const totalBatches = Math.ceil(fileIds.length / MAX_FILES_PER_BATCH);
+        const emailResponse = await resend.emails.send({
+          from: "Watermark System <onboarding@resend.dev>",
+          to: [email],
+          subject: "קבצים",
+          html: `
+            <div dir="rtl">
+              <p>הקבצים המוטמעים שלך מצורפים, שמור על הקבצים לשימוש אישי בלבד ואל תשתף אותם</p>
+              ${totalBatches > 1 ? `<p>חלק ${batchNumber} מתוך ${totalBatches}</p>` : ''}
+            </div>
+          `,
+          attachments: attachments,
+        });
+        console.log(`Batch ${batchNumber} sent:`, emailResponse);
+        sendResults.push(emailResponse);
+      }
     }
 
     return new Response(JSON.stringify({ success: true, results: sendResults, emailResponse: sendResults[0] }), {
