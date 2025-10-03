@@ -57,7 +57,7 @@ serve(async (req) => {
       attachments.push({
         filename: fileName,
         content: base64Content,
-        encoding: "base64",
+        contentType: "application/pdf",
       });
     }
 
