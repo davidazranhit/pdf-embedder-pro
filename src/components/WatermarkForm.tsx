@@ -21,17 +21,25 @@ export const WatermarkForm = ({
       <div className="space-y-2">
         <Label htmlFor="email" className="text-foreground flex items-center gap-2">
           <Mail className="w-4 h-4" />
-          כתובת אימייל
+          שם משתמש Gmail
         </Label>
-        <Input
-          id="email"
-          type="email"
-          placeholder="example@email.com"
-          value={email}
-          onChange={(e) => onEmailChange(e.target.value)}
-          required
-          className="bg-background"
-        />
+        <div className="relative">
+          <Input
+            id="email"
+            type="text"
+            placeholder="username"
+            value={email.replace('@gmail.com', '')}
+            onChange={(e) => {
+              const username = e.target.value.replace('@', '');
+              onEmailChange(username + '@gmail.com');
+            }}
+            required
+            className="bg-background pr-28"
+          />
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none text-sm">
+            @gmail.com
+          </span>
+        </div>
       </div>
       <div className="space-y-2">
         <Label htmlFor="userId" className="text-foreground flex items-center gap-2">
