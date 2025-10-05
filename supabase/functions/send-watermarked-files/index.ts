@@ -98,7 +98,7 @@ serve(async (req) => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        sender: { name: 'Watermark System', email: 'davidazranhit@gmail.com' },
+        sender: { name: "David's Pdf", email: 'davidazranhit@gmail.com' },
         to: [{ email: email }],
         subject: 'קבצים מהקורס',
         htmlContent: `
