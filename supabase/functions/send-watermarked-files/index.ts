@@ -98,12 +98,14 @@ serve(async (req) => {
       html: `
         <div dir="rtl" style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px;">
           <p style="margin-bottom: 16px;">שלום,</p>
-          <p style="margin-bottom: 16px;">מצורפים הקבצים שלך בקורס הרלוונטי, על הקבצים מוטמעים הפרטים האישיים שלך, והם לשימוש אישי בלבד. כל שיתוף או העתקה של הקבצים יהווה הפרה של זכויות יוצרים ועלול לגרור השלכות.</p>
+          <p style="margin-bottom: 16px;">מצורפים הקבצים שלך לקורס.</p>
+          <p style="margin-bottom: 16px;">הקבצים מותאמים אישית עבורך – עם הפרטים שלך – והם נועדו לשימוש אישי בלבד.</p>
+          <p style="margin-bottom: 16px;">חשוב לדעת: כל שיתוף או העתקה של הקבצים נחשבים להפרה חמורה של זכויות יוצרים, ויגררו השלכות בהתאם.</p>
           <p style="margin-bottom: 12px; margin-top: 20px;"><strong>קבצים להורדה (זמינים ל-3 ימים):</strong></p>
           <div style="margin-right: 20px;">
             ${listItems}
           </div>
-          <p style="margin-top: 20px;">בהצלחה!</p>
+          <p style="margin-top: 20px;">בהצלחה בקורס!</p>
         </div>
       `,
     });
