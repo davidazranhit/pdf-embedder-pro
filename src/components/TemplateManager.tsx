@@ -27,8 +27,9 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
   const { toast } = useToast();
 
   const defaultCategories = ['בסיסי נתונים', 'מונחה עצמים', 'חישוביות וסיבוכיות'];
-  // Get unique categories from both defaults and database
-  const categories = Array.from(new Set([...defaultCategories, ...templates.map(t => t.category)]));
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
+  // Get unique categories from defaults, custom categories, and database
+  const categories = Array.from(new Set([...defaultCategories, ...customCategories, ...templates.map(t => t.category)]));
   
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
@@ -127,13 +128,30 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
       return;
     }
     
-    setSelectedCategory(newCategoryName.trim());
+    const categoryName = newCategoryName.trim();
+    
+    // Check if category already exists
+    if (categories.includes(categoryName)) {
+      toast({
+        title: "שגיאה",
+        description: "קטגוריה זו כבר קיימת",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Add to custom categories
+    setCustomCategories(prev => [...prev, categoryName]);
+    setSelectedCategory(categoryName);
     setShowNewCategoryInput(false);
     setNewCategoryName("");
     
+    // Expand the new category
+    setCollapsedCategories(prev => ({ ...prev, [categoryName]: false }));
+    
     toast({
       title: "קטגוריה חדשה נוצרה",
-      description: `כעת תוכל להוסיף תבניות לקטגוריה "${newCategoryName.trim()}"`,
+      description: `כעת תוכל להוסיף תבניות לקטגוריה "${categoryName}"`,
     });
   };
 
@@ -286,33 +304,51 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
             
             {categories.map(category => {
               const categoryTemplates = groupedTemplates[category] || [];
-              if (categoryTemplates.length === 0) return null;
               
-              const allSelected = categoryTemplates.every(t => selectedTemplates.some(st => st.id === t.id));
+              const allSelected = categoryTemplates.length > 0 && categoryTemplates.every(t => selectedTemplates.some(st => st.id === t.id));
               
               return (
                 <div key={category} className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="text-lg font-semibold text-foreground">{category}</h4>
                     <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleCategoryCollapse(category)}
-                      >
-                        {collapsedCategories[category] ? 'הצג' : 'מזער'}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => selectAllInCategory(category)}
-                      >
-                        {allSelected ? 'בטל בחירת הכל' : 'בחר הכל'}
-                      </Button>
+                      {categoryTemplates.length > 0 && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleCategoryCollapse(category)}
+                          >
+                            {collapsedCategories[category] ? 'הצג' : 'מזער'}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => selectAllInCategory(category)}
+                          >
+                            {allSelected ? 'בטל בחירת הכל' : 'בחר הכל'}
+                          </Button>
+                        </>
+                      )}
+                      <div className="relative">
+                        <input
+                          type="file"
+                          accept=".pdf"
+                          onChange={(e) => {
+                            handleUploadTemplate(e, category);
+                          }}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          disabled={isLoading}
+                        />
+                        <Button disabled={isLoading} size="sm" variant="outline">
+                          <Upload className="w-4 h-4 ml-2" />
+                          הוסף קובץ
+                        </Button>
+                      </div>
                     </div>
                   </div>
                   
-                  {!collapsedCategories[category] && (
+                  {!collapsedCategories[category] && categoryTemplates.length > 0 && (
                     <div className="grid gap-3 animate-fade-in">
                       {categoryTemplates.map((template) => {
                         const isSelected = selectedTemplates.some((t) => t.id === template.id);
@@ -357,6 +393,13 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
                           </div>
                         );
                       })}
+                    </div>
+                  )}
+                  
+                  {!collapsedCategories[category] && categoryTemplates.length === 0 && (
+                    <div className="text-center py-6 text-muted-foreground border-2 border-dashed rounded-lg">
+                      <p className="text-sm">אין תבניות בקטגוריה זו</p>
+                      <p className="text-xs mt-1">לחץ על "הוסף קובץ" למעלה להוספת תבנית</p>
                     </div>
                   )}
 
