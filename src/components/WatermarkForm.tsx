@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mail, IdCard } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface WatermarkFormProps {
   email: string;
@@ -16,29 +17,66 @@ export const WatermarkForm = ({
   onEmailChange,
   onUserIdChange,
 }: WatermarkFormProps) => {
+  const [useGmailSuffix, setUseGmailSuffix] = useState(false);
+
+  const handleEmailChange = (value: string) => {
+    if (useGmailSuffix) {
+      // Remove @ symbol if user tries to type it
+      const username = value.replace('@', '').replace('@gmail.com', '');
+      onEmailChange(username + '@gmail.com');
+    } else {
+      onEmailChange(value);
+    }
+  };
+
+  const handleGmailToggle = (checked: boolean) => {
+    setUseGmailSuffix(checked);
+    if (checked) {
+      // Convert current email to Gmail format
+      const username = email.split('@')[0];
+      onEmailChange(username + '@gmail.com');
+    }
+  };
+
+  const displayValue = useGmailSuffix ? email.replace('@gmail.com', '') : email;
+
   return (
     <div className="grid gap-6 md:grid-cols-2">
       <div className="space-y-2">
         <Label htmlFor="email" className="text-foreground flex items-center gap-2">
           <Mail className="w-4 h-4" />
-          שם משתמש Gmail
+          כתובת מייל
         </Label>
-        <div className="relative">
-          <Input
-            id="email"
-            type="text"
-            placeholder="username"
-            value={email.replace('@gmail.com', '')}
-            onChange={(e) => {
-              const username = e.target.value.replace('@', '');
-              onEmailChange(username + '@gmail.com');
-            }}
-            required
-            className="bg-background pr-28"
-          />
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none text-sm">
-            @gmail.com
-          </span>
+        <div className="space-y-2">
+          <div className="relative">
+            <Input
+              id="email"
+              type="text"
+              placeholder={useGmailSuffix ? "username" : "example@email.com"}
+              value={displayValue}
+              onChange={(e) => handleEmailChange(e.target.value)}
+              required
+              className={useGmailSuffix ? "bg-background pr-28" : "bg-background"}
+            />
+            {useGmailSuffix && (
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none text-sm">
+                @gmail.com
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="gmail-suffix"
+              checked={useGmailSuffix}
+              onCheckedChange={handleGmailToggle}
+            />
+            <label
+              htmlFor="gmail-suffix"
+              className="text-sm text-muted-foreground cursor-pointer"
+            >
+              השתמש בסיומת @gmail.com
+            </label>
+          </div>
         </div>
       </div>
       <div className="space-y-2">

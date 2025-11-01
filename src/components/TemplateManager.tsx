@@ -26,8 +26,14 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
   const [selectedCategory, setSelectedCategory] = useState<string>('בסיסי נתונים');
   const { toast } = useToast();
 
-  const categories = ['בסיסי נתונים', 'מונחה עצמים', 'חישוביות וסיבוכיות'];
+  const defaultCategories = ['בסיסי נתונים', 'מונחה עצמים', 'חישוביות וסיבוכיות'];
+  // Get unique categories from both defaults and database
+  const categories = Array.from(new Set([...defaultCategories, ...templates.map(t => t.category)]));
+  
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  
   const toggleCategoryCollapse = (category: string) => {
     setCollapsedCategories((prev) => ({ ...prev, [category]: !prev[category] }));
   };
@@ -35,6 +41,19 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
   useEffect(() => {
     fetchTemplates();
   }, []);
+
+  useEffect(() => {
+    // Set all new categories to collapsed by default
+    setCollapsedCategories((prev) => {
+      const newCollapsed = { ...prev };
+      categories.forEach(cat => {
+        if (!(cat in newCollapsed)) {
+          newCollapsed[cat] = true;
+        }
+      });
+      return newCollapsed;
+    });
+  }, [templates.length]);
 
   const fetchTemplates = async () => {
     const { data, error } = await supabase
@@ -50,7 +69,7 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
     setTemplates(data || []);
   };
 
-  const handleUploadTemplate = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUploadTemplate = async (e: React.ChangeEvent<HTMLInputElement>, categoryToUse?: string) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
@@ -75,7 +94,7 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
           name: file.name,
           file_path: fileName,
           file_size: file.size,
-          category: selectedCategory,
+          category: categoryToUse || selectedCategory,
         });
 
       if (dbError) throw dbError;
@@ -96,6 +115,26 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleAddNewCategory = async () => {
+    if (!newCategoryName.trim()) {
+      toast({
+        title: "שגיאה",
+        description: "אנא הזן שם לקטגוריה",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setSelectedCategory(newCategoryName.trim());
+    setShowNewCategoryInput(false);
+    setNewCategoryName("");
+    
+    toast({
+      title: "קטגוריה חדשה נוצרה",
+      description: `כעת תוכל להוסיף תבניות לקטגוריה "${newCategoryName.trim()}"`,
+    });
   };
 
   const handleDeleteTemplate = async (template: Template) => {
@@ -171,29 +210,68 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
           <h3 className="text-xl font-semibold text-foreground">תבניות PDF מוכנות</h3>
         </div>
         
-        <div className="flex items-center gap-4">
-          <select 
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-3 py-2 border rounded-lg bg-background"
-          >
-            {categories.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
-          <div className="relative">
-            <input
-              type="file"
-              accept=".pdf"
-              onChange={handleUploadTemplate}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              disabled={isLoading}
-            />
-            <Button disabled={isLoading} size="sm">
-              <Upload className="w-4 h-4 ml-2" />
-              הוסף תבנית
+        <div className="space-y-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            <select 
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="px-3 py-2 border rounded-lg bg-background"
+            >
+              {categories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+            <div className="relative">
+              <input
+                type="file"
+                accept=".pdf"
+                onChange={handleUploadTemplate}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                disabled={isLoading}
+              />
+              <Button disabled={isLoading} size="sm">
+                <Upload className="w-4 h-4 ml-2" />
+                הוסף תבנית לקטגוריה
+              </Button>
+            </div>
+            <Button 
+              onClick={() => setShowNewCategoryInput(!showNewCategoryInput)} 
+              variant="outline" 
+              size="sm"
+            >
+              + קטגוריה חדשה
             </Button>
           </div>
+          
+          {showNewCategoryInput && (
+            <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/30">
+              <input
+                type="text"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="שם קטגוריה חדשה"
+                className="flex-1 px-3 py-2 border rounded bg-background"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleAddNewCategory();
+                  }
+                }}
+              />
+              <Button onClick={handleAddNewCategory} size="sm">
+                צור
+              </Button>
+              <Button 
+                onClick={() => {
+                  setShowNewCategoryInput(false);
+                  setNewCategoryName("");
+                }} 
+                variant="ghost" 
+                size="sm"
+              >
+                ביטול
+              </Button>
+            </div>
+          )}
         </div>
 
         {templates.length === 0 ? (

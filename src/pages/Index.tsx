@@ -322,10 +322,15 @@ ${links.map((l) => {
 <p>בהצלחה בקורס!</p>
 </div>`;
 
-      // Copy HTML to clipboard
-      const blob = new Blob([htmlBody], { type: 'text/html' });
-      const data = [new ClipboardItem({ 'text/html': blob })];
-      await navigator.clipboard.write(data);
+      // Only copy to clipboard when explicitly triggered by the button
+      try {
+        const blob = new Blob([htmlBody], { type: 'text/html' });
+        const data = [new ClipboardItem({ 'text/html': blob })];
+        await navigator.clipboard.write(data);
+      } catch (clipboardError) {
+        console.error("Clipboard error:", clipboardError);
+        // Continue even if clipboard fails
+      }
 
       // Open Gmail compose
       const mailtoLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent("קבצים מהקורס")}`;
