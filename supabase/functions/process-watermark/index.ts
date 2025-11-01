@@ -45,50 +45,146 @@ serve(async (req) => {
       const pdfDoc = await PDFDocument.load(pdfBytes);
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
+      // Add metadata watermark (hidden but traceable)
+      pdfDoc.setTitle(`Protected Document - ${userId}`);
+      pdfDoc.setAuthor(email);
+      pdfDoc.setSubject(`User: ${userId} | Email: ${email}`);
+      pdfDoc.setKeywords([email, userId, 'protected', 'watermarked']);
+      pdfDoc.setProducer(`David's PDF System - User: ${userId}`);
+      pdfDoc.setCreator(`Watermarked for ${email}`);
+
       // Add watermark to each page
       const pages = pdfDoc.getPages();
       const watermarkText = `${email} | ID: ${userId}`;
 
       for (const page of pages) {
         const { width, height } = page.getSize();
-        const fontSize = 24;
-        const smallFontSize = 10;
-        const textWidth = font.widthOfTextAtSize(watermarkText, fontSize);
+        const smallFontSize = 8;
         const smallTextWidth = font.widthOfTextAtSize(watermarkText, smallFontSize);
 
-        // Calculate center position - slightly lower for better centering
-        const centerX = width / 2;
-        const centerY = (height / 2) - 50;
+        // Position calculations
+        const topX = width - smallTextWidth - 15;
+        const topY = height - 20;
+        const bottomX = 15;
+        const bottomY = 15;
+        const centerX = (width / 2) - (smallTextWidth / 2);
+        const centerY = height / 2;
 
-        // Draw diagonal watermark in center (large, more transparent)
+        // Top watermark - multiple layers with different opacities
+        // Layer 1: Very light (almost invisible but detectable)
         page.drawText(watermarkText, {
-          x: centerX - (textWidth / 2),
+          x: topX,
+          y: topY,
+          size: smallFontSize,
+          font: font,
+          color: rgb(0.9, 0.9, 0.9),
+          opacity: 0.05,
+        });
+        
+        // Layer 2: Light
+        page.drawText(watermarkText, {
+          x: topX,
+          y: topY,
+          size: smallFontSize,
+          font: font,
+          color: rgb(0.7, 0.7, 0.7),
+          opacity: 0.15,
+        });
+        
+        // Layer 3: Visible
+        page.drawText(watermarkText, {
+          x: topX,
+          y: topY,
+          size: smallFontSize,
+          font: font,
+          color: rgb(0.5, 0.5, 0.5),
+          opacity: 0.4,
+        });
+
+        // Bottom watermark - multiple layers
+        page.drawText(watermarkText, {
+          x: bottomX,
+          y: bottomY,
+          size: smallFontSize,
+          font: font,
+          color: rgb(0.9, 0.9, 0.9),
+          opacity: 0.05,
+        });
+        
+        page.drawText(watermarkText, {
+          x: bottomX,
+          y: bottomY,
+          size: smallFontSize,
+          font: font,
+          color: rgb(0.7, 0.7, 0.7),
+          opacity: 0.15,
+        });
+        
+        page.drawText(watermarkText, {
+          x: bottomX,
+          y: bottomY,
+          size: smallFontSize,
+          font: font,
+          color: rgb(0.5, 0.5, 0.5),
+          opacity: 0.4,
+        });
+
+        // Center watermark - diagonal with multiple layers
+        const centerTextWidth = font.widthOfTextAtSize(watermarkText, smallFontSize);
+        
+        // Hidden layer (almost invisible)
+        page.drawText(watermarkText, {
+          x: centerX,
           y: centerY,
-          size: fontSize,
+          size: smallFontSize,
+          font: font,
+          color: rgb(0.95, 0.95, 0.95),
+          opacity: 0.03,
+          rotate: degrees(45),
+        });
+        
+        // Semi-hidden layer
+        page.drawText(watermarkText, {
+          x: centerX,
+          y: centerY,
+          size: smallFontSize,
+          font: font,
+          color: rgb(0.8, 0.8, 0.8),
+          opacity: 0.08,
+          rotate: degrees(45),
+        });
+        
+        // Visible but subtle layer
+        page.drawText(watermarkText, {
+          x: centerX,
+          y: centerY,
+          size: smallFontSize,
           font: font,
           color: rgb(0.6, 0.6, 0.6),
-          opacity: 0.25,
+          opacity: 0.2,
           rotate: degrees(45),
         });
 
-        // Add small watermark at top right
+        // Add additional hidden layers at different angles (forensic watermarks)
+        // These are almost invisible but can be detected programmatically
         page.drawText(watermarkText, {
-          x: width - smallTextWidth - 20,
-          y: height - 30,
-          size: smallFontSize,
+          x: centerX + 5,
+          y: centerY + 5,
+          size: smallFontSize - 2,
           font: font,
-          color: rgb(0.5, 0.5, 0.5),
-          opacity: 0.5,
+          color: rgb(0.98, 0.98, 0.98),
+          opacity: 0.02,
+          rotate: degrees(30),
         });
-
-        // Add small watermark at bottom left
+        
         page.drawText(watermarkText, {
-          x: 20,
-          y: 20,
-          size: smallFontSize,
+          x: centerX - 5,
+          y: centerY - 5,
+          size: smallFontSize - 2,
           font: font,
-          color: rgb(0.5, 0.5, 0.5),
-          opacity: 0.5,
+          color: rgb(0.98, 0.98, 0.98),
+          opacity: 0.02,
+          rotate: degrees(60),
         });
       }
 
