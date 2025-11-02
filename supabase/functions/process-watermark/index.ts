@@ -60,7 +60,7 @@ serve(async (req) => {
       for (const page of pages) {
         const { width, height } = page.getSize();
         const smallFontSize = 8;
-        const centerFontSize = 14; // Larger font for center watermark
+        const centerFontSize = 20; // Even larger font for center watermark
         const smallTextWidth = font.widthOfTextAtSize(watermarkText, smallFontSize);
         const centerTextWidth = font.widthOfTextAtSize(watermarkText, centerFontSize);
 
@@ -70,7 +70,7 @@ serve(async (req) => {
         const bottomX = 15;
         const bottomY = 15;
         const centerX = (width / 2) - (centerTextWidth / 2);
-        const centerY = height / 2;
+        const centerY = (height / 2) - 30; // Lower position for better centering
 
         // Top watermark - multiple layers with different opacities
         // Layer 1: Very light (almost invisible but detectable)
