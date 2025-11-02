@@ -27,9 +27,9 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
   const { toast } = useToast();
 
   const defaultCategories = ['בסיסי נתונים', 'מונחה עצמים', 'חישוביות וסיבוכיות'];
-  const [customCategories, setCustomCategories] = useState<string[]>([]);
-  // Get unique categories from defaults, custom categories, and database
-  const categories = Array.from(new Set([...defaultCategories, ...customCategories, ...templates.map(t => t.category)]));
+  const [dbCategories, setDbCategories] = useState<string[]>([]);
+  // Get unique categories from defaults, database categories, and templates
+  const categories = Array.from(new Set([...defaultCategories, ...dbCategories, ...templates.map(t => t.category)]));
   
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
@@ -41,7 +41,22 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
 
   useEffect(() => {
     fetchTemplates();
+    fetchCategories();
   }, []);
+
+  const fetchCategories = async () => {
+    const { data, error } = await supabase
+      .from("categories")
+      .select("name")
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching categories:", error);
+      return;
+    }
+
+    setDbCategories(data?.map(c => c.name) || []);
+  };
 
   useEffect(() => {
     // Set all new categories to collapsed by default
@@ -140,19 +155,35 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
       return;
     }
     
-    // Add to custom categories
-    setCustomCategories(prev => [...prev, categoryName]);
-    setSelectedCategory(categoryName);
-    setShowNewCategoryInput(false);
-    setNewCategoryName("");
-    
-    // Expand the new category
-    setCollapsedCategories(prev => ({ ...prev, [categoryName]: false }));
-    
-    toast({
-      title: "קטגוריה חדשה נוצרה",
-      description: `כעת תוכל להוסיף תבניות לקטגוריה "${categoryName}"`,
-    });
+    try {
+      // Save to database
+      const { error } = await supabase
+        .from("categories")
+        .insert({ name: categoryName });
+
+      if (error) throw error;
+
+      // Update local state
+      setDbCategories(prev => [...prev, categoryName]);
+      setSelectedCategory(categoryName);
+      setShowNewCategoryInput(false);
+      setNewCategoryName("");
+      
+      // Expand the new category
+      setCollapsedCategories(prev => ({ ...prev, [categoryName]: false }));
+      
+      toast({
+        title: "קטגוריה חדשה נוצרה",
+        description: `כעת תוכל להוסיף תבניות לקטגוריה "${categoryName}"`,
+      });
+    } catch (error) {
+      console.error("Error creating category:", error);
+      toast({
+        title: "שגיאה",
+        description: "לא ניתן ליצור את הקטגוריה",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDeleteTemplate = async (template: Template) => {
