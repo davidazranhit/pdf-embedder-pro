@@ -60,14 +60,16 @@ serve(async (req) => {
       for (const page of pages) {
         const { width, height } = page.getSize();
         const smallFontSize = 8;
+        const centerFontSize = 14; // Larger font for center watermark
         const smallTextWidth = font.widthOfTextAtSize(watermarkText, smallFontSize);
+        const centerTextWidth = font.widthOfTextAtSize(watermarkText, centerFontSize);
 
         // Position calculations
         const topX = width - smallTextWidth - 15;
         const topY = height - 20;
         const bottomX = 15;
         const bottomY = 15;
-        const centerX = (width / 2) - (smallTextWidth / 2);
+        const centerX = (width / 2) - (centerTextWidth / 2);
         const centerY = height / 2;
 
         // Top watermark - multiple layers with different opacities
@@ -129,14 +131,12 @@ serve(async (req) => {
           opacity: 0.4,
         });
 
-        // Center watermark - diagonal with multiple layers
-        const centerTextWidth = font.widthOfTextAtSize(watermarkText, smallFontSize);
-        
+        // Center watermark - diagonal with multiple layers (larger font)
         // Hidden layer (almost invisible)
         page.drawText(watermarkText, {
           x: centerX,
           y: centerY,
-          size: smallFontSize,
+          size: centerFontSize,
           font: font,
           color: rgb(0.95, 0.95, 0.95),
           opacity: 0.03,
@@ -147,7 +147,7 @@ serve(async (req) => {
         page.drawText(watermarkText, {
           x: centerX,
           y: centerY,
-          size: smallFontSize,
+          size: centerFontSize,
           font: font,
           color: rgb(0.8, 0.8, 0.8),
           opacity: 0.08,
@@ -158,10 +158,10 @@ serve(async (req) => {
         page.drawText(watermarkText, {
           x: centerX,
           y: centerY,
-          size: smallFontSize,
+          size: centerFontSize,
           font: font,
           color: rgb(0.6, 0.6, 0.6),
-          opacity: 0.2,
+          opacity: 0.18,
           rotate: degrees(45),
         });
 
@@ -170,7 +170,7 @@ serve(async (req) => {
         page.drawText(watermarkText, {
           x: centerX + 5,
           y: centerY + 5,
-          size: smallFontSize - 2,
+          size: centerFontSize - 2,
           font: font,
           color: rgb(0.98, 0.98, 0.98),
           opacity: 0.02,
@@ -180,7 +180,7 @@ serve(async (req) => {
         page.drawText(watermarkText, {
           x: centerX - 5,
           y: centerY - 5,
-          size: smallFontSize - 2,
+          size: centerFontSize - 2,
           font: font,
           color: rgb(0.98, 0.98, 0.98),
           opacity: 0.02,
