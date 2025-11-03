@@ -27,6 +27,7 @@ const Index = () => {
   const [userId, setUserId] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [sendWithoutWatermark, setSendWithoutWatermark] = useState(false);
   const { toast } = useToast();
 
   const handleFilesSelected = (newFiles: File[]) => {
@@ -172,10 +173,53 @@ const Index = () => {
   };
 
   const handleSendEmail = async () => {
-    if (processedFiles.length === 0) {
+    // Determine which files to send
+    let fileIdsToSend: string[] = [];
+    
+    if (sendWithoutWatermark) {
+      // Send original files
+      if (files.length === 0) {
+        toast({
+          title: "שגיאה",
+          description: "אין קבצים לשליחה",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Collect original file paths
+      for (const fileItem of files) {
+        if (fileItem.source === "template" && fileItem.templatePath) {
+          fileIdsToSend.push(fileItem.templatePath);
+        } else if (fileItem.source === "upload" && fileItem.file) {
+          // Need to upload first if not already uploaded
+          const fileName = buildStoragePath('uploads', fileItem.file.name);
+          const { error: uploadError } = await supabase.storage
+            .from("pdf-files")
+            .upload(fileName, fileItem.file, { upsert: true });
+          
+          if (!uploadError) {
+            fileIdsToSend.push(fileName);
+          }
+        }
+      }
+    } else {
+      // Send processed files
+      if (processedFiles.length === 0) {
+        toast({
+          title: "שגיאה",
+          description: "אין קבצים מעובדים לשליחה. הטמע Watermarks תחילה.",
+          variant: "destructive",
+        });
+        return;
+      }
+      fileIdsToSend = processedFiles;
+    }
+
+    if (fileIdsToSend.length === 0) {
       toast({
         title: "שגיאה",
-        description: "אין קבצים מעובדים לשליחה",
+        description: "לא נמצאו קבצים לשליחה",
         variant: "destructive",
       });
       return;
@@ -184,14 +228,14 @@ const Index = () => {
     setIsSending(true);
     try {
       const { error } = await supabase.functions.invoke("send-watermarked-files", {
-        body: { email, fileIds: processedFiles },
+        body: { email, fileIds: fileIdsToSend },
       });
 
       if (error) throw error;
 
       toast({
         title: "נשלח בהצלחה!",
-        description: `הקבצים נשלחו ל-${email}`,
+        description: `${fileIdsToSend.length} קבצים נשלחו ל-${email}`,
       });
     } catch (error) {
       console.error("Send error:", error);
@@ -206,17 +250,60 @@ const Index = () => {
   };
 
   const handleDownloadAll = async () => {
-    if (processedFiles.length === 0) {
+    // Determine which files to download
+    let fileIdsToDownload: string[] = [];
+    
+    if (sendWithoutWatermark) {
+      // Download original files
+      if (files.length === 0) {
+        toast({
+          title: "שגיאה",
+          description: "אין קבצים להורדה",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Collect original file paths
+      for (const fileItem of files) {
+        if (fileItem.source === "template" && fileItem.templatePath) {
+          fileIdsToDownload.push(fileItem.templatePath);
+        } else if (fileItem.source === "upload" && fileItem.file) {
+          // Need to upload first if not already uploaded
+          const fileName = buildStoragePath('uploads', fileItem.file.name);
+          const { error: uploadError } = await supabase.storage
+            .from("pdf-files")
+            .upload(fileName, fileItem.file, { upsert: true });
+          
+          if (!uploadError) {
+            fileIdsToDownload.push(fileName);
+          }
+        }
+      }
+    } else {
+      // Download processed files
+      if (processedFiles.length === 0) {
+        toast({
+          title: "שגיאה",
+          description: "אין קבצים מעובדים להורדה",
+          variant: "destructive",
+        });
+        return;
+      }
+      fileIdsToDownload = processedFiles;
+    }
+
+    if (fileIdsToDownload.length === 0) {
       toast({
         title: "שגיאה",
-        description: "אין קבצים מעובדים להורדה",
+        description: "לא נמצאו קבצים להורדה",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      for (const filePath of processedFiles) {
+      for (const filePath of fileIdsToDownload) {
         const { data, error } = await supabase.storage
           .from("pdf-files")
           .download(filePath);
@@ -238,7 +325,7 @@ const Index = () => {
 
       toast({
         title: "הורדה החלה",
-        description: `מוריד ${processedFiles.length} קבצים`,
+        description: `מוריד ${fileIdsToDownload.length} קבצים`,
       });
     } catch (error) {
       console.error("Download error:", error);
@@ -251,10 +338,53 @@ const Index = () => {
   };
 
   const handleManualEmail = async () => {
-    if (processedFiles.length === 0) {
+    // Determine which files to send
+    let fileIdsToSend: string[] = [];
+    
+    if (sendWithoutWatermark) {
+      // Send original files
+      if (files.length === 0) {
+        toast({
+          title: "שגיאה",
+          description: "אין קבצים לשליחה",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Collect original file paths
+      for (const fileItem of files) {
+        if (fileItem.source === "template" && fileItem.templatePath) {
+          fileIdsToSend.push(fileItem.templatePath);
+        } else if (fileItem.source === "upload" && fileItem.file) {
+          // Need to upload first if not already uploaded
+          const fileName = buildStoragePath('uploads', fileItem.file.name);
+          const { error: uploadError } = await supabase.storage
+            .from("pdf-files")
+            .upload(fileName, fileItem.file, { upsert: true });
+          
+          if (!uploadError) {
+            fileIdsToSend.push(fileName);
+          }
+        }
+      }
+    } else {
+      // Send processed files
+      if (processedFiles.length === 0) {
+        toast({
+          title: "שגיאה",
+          description: "אין קבצים מעובדים. הטמע Watermarks תחילה.",
+          variant: "destructive",
+        });
+        return;
+      }
+      fileIdsToSend = processedFiles;
+    }
+
+    if (fileIdsToSend.length === 0) {
       toast({
         title: "שגיאה",
-        description: "אין קבצים מעובדים",
+        description: "לא נמצאו קבצים לשליחה",
         variant: "destructive",
       });
       return;
@@ -264,7 +394,7 @@ const Index = () => {
       // Create signed URLs for all files
       const links: { name: string; url: string }[] = [];
 
-      for (const fileId of processedFiles) {
+      for (const fileId of fileIdsToSend) {
         const processedFileName = fileId.split('/').pop() || 'document.pdf';
         const fileNameWithoutUserId = processedFileName.replace(/_[^_]+\.pdf$/, '.pdf');
         
@@ -380,6 +510,8 @@ ${links.map((l) => {
                   userId={userId}
                   onEmailChange={setEmail}
                   onUserIdChange={setUserId}
+                  sendWithoutWatermark={sendWithoutWatermark}
+                  onSendWithoutWatermarkChange={setSendWithoutWatermark}
                 />
               </div>
 
@@ -409,25 +541,27 @@ ${links.map((l) => {
               {/* Action Buttons */}
               {files.length > 0 && (
                 <div className="space-y-4">
-                  <Button
-                    onClick={handleProcess}
-                    disabled={isProcessing || !email || !userId}
-                    className="w-full h-12 text-lg bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
-                  >
-                    {isProcessing ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin ml-2" />
-                        מעבד...
-                      </>
-                    ) : (
-                      <>
-                        <FileCheck className="w-5 h-5 ml-2" />
-                        הטמע Watermarks
-                      </>
-                    )}
-                  </Button>
+                  {!sendWithoutWatermark && (
+                    <Button
+                      onClick={handleProcess}
+                      disabled={isProcessing || !email || !userId}
+                      className="w-full h-12 text-lg bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
+                    >
+                      {isProcessing ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin ml-2" />
+                          מעבד...
+                        </>
+                      ) : (
+                        <>
+                          <FileCheck className="w-5 h-5 ml-2" />
+                          הטמע Watermarks
+                        </>
+                      )}
+                    </Button>
+                  )}
 
-                  {processedFiles.length > 0 && (
+                  {(processedFiles.length > 0 || sendWithoutWatermark) && (
                     <div className="space-y-3">
                       <Button
                         onClick={handleDownloadAll}
