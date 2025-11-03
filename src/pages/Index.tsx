@@ -407,11 +407,11 @@ const Index = () => {
         let finalFileName = processedFileName;
         if (templateData?.name) {
           const originalNameWithoutExt = templateData.name.replace(/\.pdf$/i, '');
-          finalFileName = userId ? `${originalNameWithoutExt}_${userId}.pdf` : templateData.name;
-        } else if (userId && !processedFileName.includes(`_${userId}.pdf`)) {
-          // For uploaded files without template match, add userId
-          const nameWithoutExt = processedFileName.replace(/\.pdf$/i, '');
-          finalFileName = `${nameWithoutExt}_${userId}.pdf`;
+          finalFileName = userId ? `${originalNameWithoutExt}${userId}.pdf` : templateData.name;
+        } else if (userId) {
+          // For uploaded files without template match, add userId directly without underscore
+          const nameWithoutExt = processedFileName.replace(/_[^_]+\.pdf$/i, '').replace(/\.pdf$/i, '');
+          finalFileName = `${nameWithoutExt}${userId}.pdf`;
         }
 
         const { data: signed, error: signedError } = await supabase.storage
@@ -448,7 +448,7 @@ const Index = () => {
 <p>חשוב לדעת: כל שיתוף או העתקה של הקבצים נחשבים להפרה חמורה של זכויות יוצרים, ויגררו השלכות בהתאם.</p>
 <p>קבצים להורדה (זמינים ל-3 ימים):</p>
 ${links.map((l) => {
-  const courseName = l.name.replace(/_\d+\.pdf$/, '').replace(/\.pdf$/i, '');
+  const courseName = l.name.replace(/\d+\.pdf$/i, '').replace(/\.pdf$/i, '');
   return `<p>• <a href="${l.url}">${courseName}</a></p>`;
 }).join('\n')}
 <p>בהצלחה בקורס!</p>

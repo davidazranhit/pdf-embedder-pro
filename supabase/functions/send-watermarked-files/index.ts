@@ -53,11 +53,11 @@ serve(async (req) => {
         let finalFileName = processedFileName;
         if (templateData?.name) {
           const originalNameWithoutExt = templateData.name.replace(/\.pdf$/i, '');
-          finalFileName = userIdFromFile ? `${originalNameWithoutExt}_${userIdFromFile}.pdf` : templateData.name;
-        } else if (userIdFromFile && !processedFileName.includes(`_${userIdFromFile}.pdf`)) {
-          // For uploaded files without template match, ensure userId is in name
-          const nameWithoutExt = processedFileName.replace(/\.pdf$/i, '');
-          finalFileName = `${nameWithoutExt}_${userIdFromFile}.pdf`;
+          finalFileName = userIdFromFile ? `${originalNameWithoutExt}${userIdFromFile}.pdf` : templateData.name;
+        } else if (userIdFromFile) {
+          // For uploaded files without template match, add userId directly without underscore
+          const nameWithoutExt = processedFileName.replace(/_[^_]+\.pdf$/i, '').replace(/\.pdf$/i, '');
+          finalFileName = `${nameWithoutExt}${userIdFromFile}.pdf`;
         }
 
         // Create a signed URL valid for 3 days
@@ -89,7 +89,7 @@ serve(async (req) => {
 
     const listItems = links
       .map((l) => {
-        const courseName = l.name.replace(/_\d+\.pdf$/, '').replace(/\.pdf$/i, '');
+        const courseName = l.name.replace(/\d+\.pdf$/i, '').replace(/\.pdf$/i, '');
         return `<p style="margin: 8px 0;">• <a href="${l.url}" style="color: #0066cc; text-decoration: none;">${courseName}</a></p>`;
       })
       .join('');
