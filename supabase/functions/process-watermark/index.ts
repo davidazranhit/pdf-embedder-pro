@@ -59,7 +59,7 @@ serve(async (req) => {
 
       for (const page of pages) {
         const { width, height } = page.getSize();
-        const smallFontSize = 8;
+        const smallFontSize = 10; // Increased from 8 for better visibility
         const centerFontSize = 20; // Even larger font for center watermark
         const smallTextWidth = font.widthOfTextAtSize(watermarkText, smallFontSize);
         const centerTextWidth = font.widthOfTextAtSize(watermarkText, centerFontSize);
