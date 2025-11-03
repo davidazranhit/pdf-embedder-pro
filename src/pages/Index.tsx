@@ -406,10 +406,12 @@ const Index = () => {
 
         let finalFileName = processedFileName;
         if (templateData?.name) {
-          const userIdMatch = processedFileName.match(/_([^_]+)\.pdf$/);
-          const userIdPart = userIdMatch ? userIdMatch[1] : '';
           const originalNameWithoutExt = templateData.name.replace(/\.pdf$/i, '');
-          finalFileName = userIdPart ? `${originalNameWithoutExt}_${userIdPart}.pdf` : templateData.name;
+          finalFileName = userId ? `${originalNameWithoutExt}_${userId}.pdf` : templateData.name;
+        } else if (userId && !processedFileName.includes(`_${userId}.pdf`)) {
+          // For uploaded files without template match, add userId
+          const nameWithoutExt = processedFileName.replace(/\.pdf$/i, '');
+          finalFileName = `${nameWithoutExt}_${userId}.pdf`;
         }
 
         const { data: signed, error: signedError } = await supabase.storage

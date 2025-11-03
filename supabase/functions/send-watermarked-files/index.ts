@@ -39,9 +39,11 @@ serve(async (req) => {
 
     for (const fileId of fileIds) {
       try {
-        // Derive final (Hebrew) file name
+        // Derive final (Hebrew) file name with userId from processed filename
         const processedFileName = fileId.split('/').pop() || 'document.pdf';
         const fileNameWithoutUserId = processedFileName.replace(/_[^_]+\.pdf$/, '.pdf');
+        const userIdFromFile = processedFileName.match(/_([^_]+)\.pdf$/)?.[1] || '';
+        
         const { data: templateData } = await supabase
           .from('pdf_templates')
           .select('name, file_path')
@@ -50,9 +52,12 @@ serve(async (req) => {
 
         let finalFileName = processedFileName;
         if (templateData?.name) {
-          const userId = processedFileName.match(/_([^_]+)\.pdf$/)?.[1] || '';
           const originalNameWithoutExt = templateData.name.replace(/\.pdf$/i, '');
-          finalFileName = userId ? `${originalNameWithoutExt}_${userId}.pdf` : templateData.name;
+          finalFileName = userIdFromFile ? `${originalNameWithoutExt}_${userIdFromFile}.pdf` : templateData.name;
+        } else if (userIdFromFile && !processedFileName.includes(`_${userIdFromFile}.pdf`)) {
+          // For uploaded files without template match, ensure userId is in name
+          const nameWithoutExt = processedFileName.replace(/\.pdf$/i, '');
+          finalFileName = `${nameWithoutExt}_${userIdFromFile}.pdf`;
         }
 
         // Create a signed URL valid for 3 days
