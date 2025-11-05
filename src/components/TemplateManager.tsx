@@ -130,6 +130,8 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
       });
     } finally {
       setIsLoading(false);
+      // Reset the input value to allow uploading the same file again
+      e.target.value = '';
     }
   };
 
