@@ -274,7 +274,7 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
               <input
                 type="file"
                 accept=".pdf"
-                onChange={handleUploadTemplate}
+                onChange={(e) => handleUploadTemplate(e, selectedCategory)}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 disabled={isLoading}
               />
