@@ -406,12 +406,11 @@ const Index = () => {
 
         let finalFileName = processedFileName;
         if (templateData?.name) {
-          const originalNameWithoutExt = templateData.name.replace(/\.pdf$/i, '');
-          finalFileName = userId ? `${originalNameWithoutExt}${userId}.pdf` : templateData.name;
-        } else if (userId) {
-          // For uploaded files without template match, add userId directly without underscore
-          const nameWithoutExt = processedFileName.replace(/_[^_]+\.pdf$/i, '').replace(/\.pdf$/i, '');
-          finalFileName = `${nameWithoutExt}${userId}.pdf`;
+          // Use exact system name (preserve Hebrew and spaces)
+          finalFileName = templateData.name.endsWith('.pdf') ? templateData.name : `${templateData.name}.pdf`;
+        } else {
+          // Uploaded file without template match: use original base name without userId suffix
+          finalFileName = processedFileName.replace(/_[^_]+\.pdf$/i, '.pdf');
         }
 
         const { data: signed, error: signedError } = await supabase.storage
@@ -423,12 +422,14 @@ const Index = () => {
           continue;
         }
 
-        // Ensure the URL is absolute
-        const signedUrl = signed.signedUrl.startsWith('http') 
+        // Ensure the URL is absolute and force download filename
+        const baseUrl = signed.signedUrl.startsWith('http') 
           ? signed.signedUrl 
           : `${import.meta.env.VITE_SUPABASE_URL}/storage/v1${signed.signedUrl}`;
+        const delimiter = baseUrl.includes('?') ? '&' : '?';
+        const finalUrl = `${baseUrl}${delimiter}download=${encodeURIComponent(finalFileName)}`;
 
-        links.push({ name: finalFileName, url: signedUrl });
+        links.push({ name: finalFileName, url: finalUrl });
       }
 
       if (links.length === 0) {
@@ -448,8 +449,7 @@ const Index = () => {
 <p>חשוב לדעת: כל שיתוף או העתקה של הקבצים נחשבים להפרה חמורה של זכויות יוצרים, ויגררו השלכות בהתאם.</p>
 <p>קבצים להורדה (זמינים ל-3 ימים):</p>
 ${links.map((l) => {
-  const courseName = l.name.replace(/\d+\.pdf$/i, '').replace(/\.pdf$/i, '');
-  return `<p>• <a href="${l.url}">${courseName}</a></p>`;
+  return `<p>• <a href="${l.url}">${l.name}</a></p>`;
 }).join('\n')}
 <p>בהצלחה בקורס!</p>
 </div>`;

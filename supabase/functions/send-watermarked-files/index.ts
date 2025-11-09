@@ -52,12 +52,11 @@ serve(async (req) => {
 
         let finalFileName = processedFileName;
         if (templateData?.name) {
-          const originalNameWithoutExt = templateData.name.replace(/\.pdf$/i, '');
-          finalFileName = userIdFromFile ? `${originalNameWithoutExt}${userIdFromFile}.pdf` : templateData.name;
-        } else if (userIdFromFile) {
-          // For uploaded files without template match, add userId directly without underscore
-          const nameWithoutExt = processedFileName.replace(/_[^_]+\.pdf$/i, '').replace(/\.pdf$/i, '');
-          finalFileName = `${nameWithoutExt}${userIdFromFile}.pdf`;
+          // Use the exact name stored in the system (preserve Hebrew and spaces)
+          finalFileName = templateData.name.endsWith('.pdf') ? templateData.name : `${templateData.name}.pdf`;
+        } else {
+          // Uploaded file without template match: use original base name without userId suffix
+          finalFileName = processedFileName.replace(/_[^_]+\.pdf$/i, '.pdf');
         }
 
         // Create a signed URL valid for 3 days
@@ -69,12 +68,14 @@ serve(async (req) => {
           continue;
         }
 
-        // Ensure the URL is absolute
-        const signedUrl = signed.signedUrl.startsWith('http') 
+        // Ensure the URL is absolute and force download filename
+        const baseUrl = signed.signedUrl.startsWith('http') 
           ? signed.signedUrl 
           : `${Deno.env.get("SUPABASE_URL")}/storage/v1${signed.signedUrl}`;
+        const delimiter = baseUrl.includes('?') ? '&' : '?';
+        const finalUrl = `${baseUrl}${delimiter}download=${encodeURIComponent(finalFileName)}`;
 
-        links.push({ name: finalFileName, url: signedUrl });
+        links.push({ name: finalFileName, url: finalUrl });
       } catch (err) {
         console.error('Error preparing link for', fileId, err);
       }
@@ -89,8 +90,7 @@ serve(async (req) => {
 
     const listItems = links
       .map((l) => {
-        const courseName = l.name.replace(/\d+\.pdf$/i, '').replace(/\.pdf$/i, '');
-        return `<p style="margin: 8px 0;">• <a href="${l.url}" style="color: #0066cc; text-decoration: none;">${courseName}</a></p>`;
+        return `<p style="margin: 8px 0;">• <a href="${l.url}" style="color: #0066cc; text-decoration: none;">${l.name}</a></p>`;
       })
       .join('');
 

@@ -12,8 +12,7 @@ export function sanitizeFileName(name: string) {
   const base = name.replace(/\.[^/.]+$/, "");
   // Replace only unsafe characters for file systems, keep Hebrew and other Unicode
   const safe = base
-    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '-') // Remove unsafe filesystem characters
-    .replace(/\s+/g, '-') // Replace spaces with dashes
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '-') // Remove unsafe filesystem characters only
     .replace(/-+/g, '-') // Replace multiple dashes with single dash
     .replace(/^-|-$/g, ''); // Remove leading/trailing dashes
   
