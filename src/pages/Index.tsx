@@ -3,12 +3,14 @@ import { FileUploadZone } from "@/components/FileUploadZone";
 import { FileList, FileItem } from "@/components/FileList";
 import { WatermarkForm } from "@/components/WatermarkForm";
 import { TemplateManager } from "@/components/TemplateManager";
+import { BatchEmailImport, RecipientData } from "@/components/BatchEmailImport";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { buildStoragePath } from "@/lib/utils";
-import { FileCheck, Send, Download } from "lucide-react";
+import { FileCheck, Send, Download, Users, User } from "lucide-react";
 
 interface Template {
   id: string;
@@ -28,6 +30,8 @@ const Index = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [sendWithoutWatermark, setSendWithoutWatermark] = useState(false);
+  const [recipients, setRecipients] = useState<RecipientData[]>([]);
+  const [batchProcessedFiles, setBatchProcessedFiles] = useState<Map<string, string[]>>(new Map());
   const { toast } = useToast();
 
   const handleFilesSelected = (newFiles: File[]) => {
@@ -482,6 +486,151 @@ ${links.map((l) => {
     }
   };
 
+  const handleBatchProcess = async () => {
+    if (recipients.length === 0) {
+      toast({
+        title: "שגיאה",
+        description: "אנא ייבא רשימת נמענים תחילה",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (files.length === 0) {
+      toast({
+        title: "שגיאה",
+        description: "אנא העלה קבצים או בחר תבניות",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    const newBatchProcessedFiles = new Map<string, string[]>();
+
+    try {
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const recipient of recipients) {
+        try {
+          const allFileIds: string[] = [];
+          
+          // Upload user files and collect template paths
+          for (const fileItem of files) {
+            if (fileItem.source === "upload" && fileItem.file) {
+              // Upload user file
+              const fileName = buildStoragePath('uploads', fileItem.file.name);
+              const { error: uploadError } = await supabase.storage
+                .from("pdf-files")
+                .upload(fileName, fileItem.file, { upsert: true });
+
+              if (uploadError) {
+                console.error("Upload error:", uploadError);
+                continue;
+              }
+              allFileIds.push(fileName);
+            } else if (fileItem.source === "template" && fileItem.templatePath) {
+              // Use template path directly
+              allFileIds.push(fileItem.templatePath);
+            }
+          }
+
+          if (allFileIds.length === 0) {
+            errorCount++;
+            continue;
+          }
+
+          // Process watermarks for this recipient
+          const { data, error } = await supabase.functions.invoke("process-watermark", {
+            body: { fileIds: allFileIds, email: recipient.email, userId: recipient.id },
+          });
+
+          if (error) {
+            console.error("Process error for", recipient.email, error);
+            errorCount++;
+            continue;
+          }
+
+          const processed = data.files.map((f: any) => f.processedId);
+          newBatchProcessedFiles.set(recipient.email, processed);
+          successCount++;
+        } catch (error) {
+          console.error("Error processing for", recipient.email, error);
+          errorCount++;
+        }
+      }
+
+      setBatchProcessedFiles(newBatchProcessedFiles);
+      
+      toast({
+        title: "עיבוד הושלם!",
+        description: `${successCount} נמענים עובדו בהצלחה${errorCount > 0 ? `, ${errorCount} נכשלו` : ''}`,
+      });
+    } catch (error) {
+      console.error("Batch processing error:", error);
+      toast({
+        title: "שגיאה בעיבוד",
+        description: "אירעה שגיאה בעיבוד קבצים",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleBatchSend = async () => {
+    if (batchProcessedFiles.size === 0) {
+      toast({
+        title: "שגיאה",
+        description: "אין קבצים מעובדים לשליחה. הטמע תחילה",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSending(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      for (const [email, fileIds] of batchProcessedFiles.entries()) {
+        try {
+          const { error } = await supabase.functions.invoke("send-watermarked-files", {
+            body: { email, fileIds },
+          });
+
+          if (error) {
+            console.error("Send error for", email, error);
+            errorCount++;
+          } else {
+            successCount++;
+          }
+
+          // Small delay to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (error) {
+          console.error("Error sending to", email, error);
+          errorCount++;
+        }
+      }
+
+      toast({
+        title: "שליחה הושלמה!",
+        description: `${successCount} מיילים נשלחו בהצלחה${errorCount > 0 ? `, ${errorCount} נכשלו` : ''}`,
+      });
+    } catch (error) {
+      console.error("Batch send error:", error);
+      toast({
+        title: "שגיאה בשליחה",
+        description: "אירעה שגיאה בשליחת הקבצים",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
       <div className="container mx-auto px-4 py-12">
@@ -499,54 +648,164 @@ ${links.map((l) => {
             </p>
           </div>
 
-          {/* Main Card */}
+          {/* Main Card with Tabs */}
           <Card className="p-8 shadow-lg border-border/50">
-            <div className="space-y-8">
-              {/* Form */}
-              <div>
-                <h2 className="text-2xl font-semibold mb-6 text-foreground">
-                  פרטי הטמעה
-                </h2>
-                <WatermarkForm
-                  email={email}
-                  userId={userId}
-                  onEmailChange={setEmail}
-                  onUserIdChange={setUserId}
-                  sendWithoutWatermark={sendWithoutWatermark}
-                  onSendWithoutWatermarkChange={setSendWithoutWatermark}
+            <Tabs defaultValue="single" dir="rtl">
+              <TabsList className="grid w-full grid-cols-2 mb-8">
+                <TabsTrigger value="single" className="flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  משתמש בודד
+                </TabsTrigger>
+                <TabsTrigger value="batch" className="flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  שליחה מרובה
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Single User Tab */}
+              <TabsContent value="single" className="space-y-8">
+                {/* Form */}
+                <div>
+                  <h2 className="text-2xl font-semibold mb-6 text-foreground">
+                    פרטי הטמעה
+                  </h2>
+                  <WatermarkForm
+                    email={email}
+                    userId={userId}
+                    onEmailChange={setEmail}
+                    onUserIdChange={setUserId}
+                    sendWithoutWatermark={sendWithoutWatermark}
+                    onSendWithoutWatermarkChange={setSendWithoutWatermark}
+                  />
+                </div>
+
+                {/* Template Manager */}
+                <TemplateManager
+                  onTemplateSelect={handleTemplateSelect}
+                  selectedTemplates={selectedTemplates}
                 />
-              </div>
 
-              {/* Template Manager */}
-              <TemplateManager
-                onTemplateSelect={handleTemplateSelect}
-                selectedTemplates={selectedTemplates}
-              />
+                {/* Upload Zone */}
+                <div>
+                  <h2 className="text-2xl font-semibold mb-6 text-foreground">
+                    העלאת קבצים נוספים
+                  </h2>
+                  <FileUploadZone onFilesSelected={handleFilesSelected} />
+                </div>
 
-              {/* Upload Zone */}
-              <div>
-                <h2 className="text-2xl font-semibold mb-6 text-foreground">
-                  העלאת קבצים נוספים
-                </h2>
-                <FileUploadZone onFilesSelected={handleFilesSelected} />
-              </div>
+                {/* File List */}
+                {files.length > 0 && (
+                  <FileList 
+                    files={files} 
+                    onRemove={handleRemoveFile}
+                    onClearAll={handleClearAll}
+                  />
+                )}
 
-              {/* File List */}
-              {files.length > 0 && (
-                <FileList 
-                  files={files} 
-                  onRemove={handleRemoveFile}
-                  onClearAll={handleClearAll}
+                {/* Action Buttons */}
+                {files.length > 0 && (
+                  <div className="space-y-4">
+                    {!sendWithoutWatermark && (
+                      <Button
+                        onClick={handleProcess}
+                        disabled={isProcessing || !email || !userId}
+                        className="w-full h-12 text-lg bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
+                      >
+                        {isProcessing ? (
+                          <>
+                            <div className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin ml-2" />
+                            מעבד...
+                          </>
+                        ) : (
+                          <>
+                            <FileCheck className="w-5 h-5 ml-2" />
+                            הטמע Watermarks
+                          </>
+                        )}
+                      </Button>
+                    )}
+
+                    {(processedFiles.length > 0 || sendWithoutWatermark) && (
+                      <div className="space-y-3">
+                        <Button
+                          onClick={handleDownloadAll}
+                          variant="outline"
+                          className="w-full h-12"
+                        >
+                          <Download className="w-5 h-5 ml-2" />
+                          הורד קבצים
+                        </Button>
+                        <div className="flex gap-4">
+                          <Button
+                            onClick={handleSendEmail}
+                            disabled={isSending}
+                            variant="outline"
+                            className="flex-1 h-12"
+                          >
+                            {isSending ? (
+                              <>
+                                <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin ml-2" />
+                                שולח...
+                              </>
+                            ) : (
+                              <>
+                                <Send className="w-5 h-5 ml-2" />
+                                שלח אוטומטית
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            onClick={handleManualEmail}
+                            variant="outline"
+                            className="flex-1 h-12"
+                          >
+                            <Send className="w-5 h-5 ml-2" />
+                            שלח ידנית (Gmail)
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* Batch Mode Tab */}
+              <TabsContent value="batch" className="space-y-8">
+                {/* Batch Email Import */}
+                <BatchEmailImport
+                  recipients={recipients}
+                  onRecipientsImport={setRecipients}
                 />
-              )}
 
-              {/* Action Buttons */}
-              {files.length > 0 && (
-                <div className="space-y-4">
-                  {!sendWithoutWatermark && (
+                {/* Template Manager */}
+                <TemplateManager
+                  onTemplateSelect={handleTemplateSelect}
+                  selectedTemplates={selectedTemplates}
+                />
+
+                {/* Upload Zone */}
+                <div>
+                  <h2 className="text-2xl font-semibold mb-6 text-foreground">
+                    העלאת קבצים נוספים
+                  </h2>
+                  <FileUploadZone onFilesSelected={handleFilesSelected} />
+                </div>
+
+                {/* File List */}
+                {files.length > 0 && (
+                  <FileList 
+                    files={files} 
+                    onRemove={handleRemoveFile}
+                    onClearAll={handleClearAll}
+                  />
+                )}
+
+                {/* Batch Action Buttons */}
+                {files.length > 0 && recipients.length > 0 && (
+                  <div className="space-y-4">
                     <Button
-                      onClick={handleProcess}
-                      disabled={isProcessing || !email || !userId}
+                      onClick={handleBatchProcess}
+                      disabled={isProcessing}
                       className="w-full h-12 text-lg bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
                     >
                       {isProcessing ? (
@@ -557,55 +816,35 @@ ${links.map((l) => {
                       ) : (
                         <>
                           <FileCheck className="w-5 h-5 ml-2" />
-                          הטמע Watermarks
+                          הטמע לכל הנמענים ({recipients.length})
                         </>
                       )}
                     </Button>
-                  )}
 
-                  {(processedFiles.length > 0 || sendWithoutWatermark) && (
-                    <div className="space-y-3">
+                    {batchProcessedFiles.size > 0 && (
                       <Button
-                        onClick={handleDownloadAll}
+                        onClick={handleBatchSend}
+                        disabled={isSending}
+                        className="w-full h-12 text-lg"
                         variant="outline"
-                        className="w-full h-12"
                       >
-                        <Download className="w-5 h-5 ml-2" />
-                        הורד קבצים
+                        {isSending ? (
+                          <>
+                            <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin ml-2" />
+                            שולח...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-5 h-5 ml-2" />
+                            שלח לכל הנמענים ({batchProcessedFiles.size})
+                          </>
+                        )}
                       </Button>
-                      <div className="flex gap-4">
-                        <Button
-                          onClick={handleSendEmail}
-                          disabled={isSending}
-                          variant="outline"
-                          className="flex-1 h-12"
-                        >
-                          {isSending ? (
-                            <>
-                              <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin ml-2" />
-                              שולח...
-                            </>
-                          ) : (
-                            <>
-                              <Send className="w-5 h-5 ml-2" />
-                              שלח אוטומטית
-                            </>
-                          )}
-                        </Button>
-                        <Button
-                          onClick={handleManualEmail}
-                          variant="outline"
-                          className="flex-1 h-12"
-                        >
-                          <Send className="w-5 h-5 ml-2" />
-                          שלח ידנית (Gmail)
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+                    )}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           </Card>
         </div>
       </div>
