@@ -35,6 +35,39 @@ export type Database = {
         }
         Relationships: []
       }
+      file_requests: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          id_number: string
+          sent_date: string | null
+          status: Database["public"]["Enums"]["request_status"]
+          submission_date: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          id_number: string
+          sent_date?: string | null
+          status?: Database["public"]["Enums"]["request_status"]
+          submission_date?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          id_number?: string
+          sent_date?: string | null
+          status?: Database["public"]["Enums"]["request_status"]
+          submission_date?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pdf_templates: {
         Row: {
           category: string
@@ -73,7 +106,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      request_status: "pending" | "sent"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -200,6 +233,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      request_status: ["pending", "sent"],
+    },
   },
 } as const

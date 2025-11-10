@@ -4,13 +4,14 @@ import { FileList, FileItem } from "@/components/FileList";
 import { WatermarkForm } from "@/components/WatermarkForm";
 import { TemplateManager } from "@/components/TemplateManager";
 import { BatchEmailImport, RecipientData } from "@/components/BatchEmailImport";
+import { FileRequestsManager } from "@/components/FileRequestsManager";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { buildStoragePath } from "@/lib/utils";
-import { FileCheck, Send, Download, Users, User } from "lucide-react";
+import { FileCheck, Send, Download, Users, User, Inbox } from "lucide-react";
 
 interface Template {
   id: string;
@@ -651,7 +652,7 @@ ${links.map((l) => {
           {/* Main Card with Tabs */}
           <Card className="p-8 shadow-lg border-border/50">
             <Tabs defaultValue="single" dir="rtl">
-              <TabsList className="grid w-full grid-cols-2 mb-8">
+              <TabsList className="grid w-full grid-cols-3 mb-8">
                 <TabsTrigger value="single" className="flex items-center gap-2">
                   <User className="w-4 h-4" />
                   משתמש בודד
@@ -659,6 +660,10 @@ ${links.map((l) => {
                 <TabsTrigger value="batch" className="flex items-center gap-2">
                   <Users className="w-4 h-4" />
                   שליחה מרובה
+                </TabsTrigger>
+                <TabsTrigger value="requests" className="flex items-center gap-2">
+                  <Inbox className="w-4 h-4" />
+                  בקשות לקבצים
                 </TabsTrigger>
               </TabsList>
 
@@ -843,6 +848,11 @@ ${links.map((l) => {
                     )}
                   </div>
                 )}
+              </TabsContent>
+
+              {/* File Requests Tab */}
+              <TabsContent value="requests" className="space-y-8">
+                <FileRequestsManager />
               </TabsContent>
             </Tabs>
           </Card>
