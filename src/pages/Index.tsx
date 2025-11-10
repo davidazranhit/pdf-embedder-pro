@@ -5,6 +5,7 @@ import { WatermarkForm } from "@/components/WatermarkForm";
 import { TemplateManager } from "@/components/TemplateManager";
 import { BatchEmailImport, RecipientData } from "@/components/BatchEmailImport";
 import { FileRequestsManager } from "@/components/FileRequestsManager";
+import { LogoutButton } from "@/components/LogoutButton";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -653,16 +654,21 @@ ${links.map((l) => {
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-5xl mx-auto space-y-8">
           {/* Header */}
-          <div className="text-center space-y-4">
-            <div className="inline-block p-3 rounded-2xl bg-gradient-to-br from-primary to-accent mb-4">
-              <FileCheck className="w-12 h-12 text-primary-foreground" />
+          <div className="space-y-4">
+            <div className="flex justify-end">
+              <LogoutButton />
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              מערכת הטמעת Watermarks
-            </h1>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              העלה קבצי PDF, הזן את פרטי ההטמעה, והמערכת תטפל בשאר
-            </p>
+            <div className="text-center">
+              <div className="inline-block p-3 rounded-2xl bg-gradient-to-br from-primary to-accent mb-4">
+                <FileCheck className="w-12 h-12 text-primary-foreground" />
+              </div>
+              <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                מערכת הטמעת Watermarks
+              </h1>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                העלה קבצי PDF, הזן את פרטי ההטמעה, והמערכת תטפל בשאר
+              </p>
+            </div>
           </div>
 
           {/* Main Card with Tabs */}

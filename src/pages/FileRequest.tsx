@@ -10,13 +10,14 @@ import { FileText, Send } from "lucide-react";
 const FileRequest = () => {
   const [email, setEmail] = useState("");
   const [idNumber, setIdNumber] = useState("");
+  const [courseName, setCourseName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!email || !idNumber) {
+    if (!email || !idNumber || !courseName) {
       toast({
         title: "שגיאה",
         description: "אנא מלא את כל השדות",
@@ -31,6 +32,7 @@ const FileRequest = () => {
       const { error } = await supabase.from("file_requests").insert({
         email,
         id_number: idNumber,
+        course_name: courseName,
       });
 
       if (error) throw error;
@@ -43,6 +45,7 @@ const FileRequest = () => {
       // Clear form
       setEmail("");
       setIdNumber("");
+      setCourseName("");
     } catch (error) {
       console.error("Error submitting request:", error);
       toast({
@@ -63,11 +66,17 @@ const FileRequest = () => {
             <FileText className="w-8 h-8 text-primary" />
           </div>
           <h1 className="text-3xl font-bold text-foreground">בקשת קבצים</h1>
-          <p className="text-muted-foreground">
-            הזן את כתובת המייל איתה נרשמת לקורס ואת תעודת הזהות שלך.
-            <br />
-            הבקשה תעבור להמשך טיפול.
-          </p>
+          <div className="text-muted-foreground space-y-2 text-sm max-w-md mx-auto">
+            <p className="font-semibold text-base">הוראות למילוי:</p>
+            <p>עליך להזין מייל ותעודת זהות וקורס מבוקש.</p>
+            <p>
+              לאחר אישור הבקשה יישלחו הקבצים המבוקשים ישירות למייל עם הפרטים האישיים 
+              מוטמעים על הקבצים למניעת שיתוף והפצה.
+            </p>
+            <p className="text-destructive font-semibold">
+              כל ניסיון שיתוף או הפצת הקבצים מהווה הפרה חמורה של זכויות יוצרים ויטופל בהתאם
+            </p>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -96,6 +105,20 @@ const FileRequest = () => {
               required
               maxLength={9}
               dir="ltr"
+              className="text-right"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="courseName">קורס מבוקש</Label>
+            <Input
+              id="courseName"
+              type="text"
+              placeholder="שם הקורס"
+              value={courseName}
+              onChange={(e) => setCourseName(e.target.value)}
+              required
+              dir="rtl"
               className="text-right"
             />
           </div>

@@ -20,6 +20,7 @@ interface FileRequest {
   id: string;
   email: string;
   id_number: string;
+  course_name: string;
   submission_date: string;
   status: "pending" | "sent";
   sent_date: string | null;
@@ -136,6 +137,7 @@ export const FileRequestsManager = () => {
                   <TableRow>
                     <TableHead className="text-right">מייל</TableHead>
                     <TableHead className="text-right">תעודת זהות</TableHead>
+                    <TableHead className="text-right">קורס מבוקש</TableHead>
                     <TableHead className="text-right">תאריך בקשה</TableHead>
                     <TableHead className="text-right">סטטוס</TableHead>
                     <TableHead className="text-right">פעולות</TableHead>
@@ -146,6 +148,7 @@ export const FileRequestsManager = () => {
                     <TableRow key={request.id}>
                       <TableCell className="font-medium">{request.email}</TableCell>
                       <TableCell>{request.id_number}</TableCell>
+                      <TableCell>{request.course_name}</TableCell>
                       <TableCell>{formatDate(request.submission_date)}</TableCell>
                       <TableCell>
                         <Badge
