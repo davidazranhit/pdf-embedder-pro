@@ -31,7 +31,7 @@ const FileRequest = () => {
     if (!validateIsraeliID(idNumber)) {
       toast({
         title: "תעודת זהות שגויה",
-        description: "אנא הזן תעודת זהות ישראלית תקינה (9 ספרות)",
+        description: "אנא הזן תעודת זהות תקינה",
         variant: "destructive",
       });
       return;
