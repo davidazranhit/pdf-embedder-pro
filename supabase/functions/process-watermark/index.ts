@@ -47,193 +47,112 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { filePath, email, userId, fileName }: WatermarkRequest = await req.json();
-    console.log("Processing watermark for:", { filePath, email, userId, fileName });
+    const body: any = await req.json();
+    const email: string = body.email;
+    const userId: string = body.userId;
 
-    // Download the original PDF
-    const { data: fileData, error: downloadError } = await supabase.storage
-      .from("pdf-files")
-      .download(filePath);
+    // Helper to process a single file path and return processedId
+    const processOne = async (path: string, displayName?: string) => {
+      console.log("Processing watermark for:", { filePath: path, email, userId, fileName: displayName });
 
-    if (downloadError) {
-      console.error("Error downloading file:", downloadError);
-      return new Response(
-        JSON.stringify({ error: `Failed to download file: ${downloadError.message}` }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 500,
+      // Download the original PDF
+      const { data: fileData, error: downloadError } = await supabase.storage
+        .from("pdf-files")
+        .download(path);
+
+      if (downloadError) {
+        throw new Error(`Failed to download file: ${downloadError.message}`);
+      }
+
+      // Load PDF
+      const pdfBytes = await fileData.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(pdfBytes);
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+      // Add metadata watermark (hidden but traceable)
+      pdfDoc.setTitle(`Protected Document - ${userId}`);
+      pdfDoc.setAuthor(email);
+      pdfDoc.setSubject(`User: ${userId} | Email: ${email}`);
+      pdfDoc.setKeywords([email, userId, 'protected', 'watermarked']);
+      pdfDoc.setProducer(`David's PDF System - User: ${userId}`);
+      pdfDoc.setCreator(`Watermarked for ${email}`);
+
+      // Add watermark to each page
+      const pages = pdfDoc.getPages();
+      const watermarkText = `${email} | ID: ${userId}`;
+
+      for (const page of pages) {
+        const { width, height } = page.getSize();
+        const smallFontSize = 10;
+        const centerFontSize = 20;
+        const smallTextWidth = font.widthOfTextAtSize(watermarkText, smallFontSize);
+        const centerTextWidth = font.widthOfTextAtSize(watermarkText, centerFontSize);
+
+        const topX = width - smallTextWidth - 15;
+        const topY = height - 20;
+        const bottomX = 15;
+        const bottomY = 15;
+        const centerX = (width / 2) - (centerTextWidth / 2);
+        const centerY = (height / 2) - 30;
+
+        // Top watermark - multiple layers
+        page.drawText(watermarkText, { x: topX, y: topY, size: smallFontSize, font, color: rgb(0.9,0.9,0.9), opacity: 0.05 });
+        page.drawText(watermarkText, { x: topX, y: topY, size: smallFontSize, font, color: rgb(0.7,0.7,0.7), opacity: 0.15 });
+        page.drawText(watermarkText, { x: topX, y: topY, size: smallFontSize, font, color: rgb(0.5,0.5,0.5), opacity: 0.4 });
+
+        // Bottom watermark - multiple layers
+        page.drawText(watermarkText, { x: bottomX, y: bottomY, size: smallFontSize, font, color: rgb(0.9,0.9,0.9), opacity: 0.05 });
+        page.drawText(watermarkText, { x: bottomX, y: bottomY, size: smallFontSize, font, color: rgb(0.7,0.7,0.7), opacity: 0.15 });
+        page.drawText(watermarkText, { x: bottomX, y: bottomY, size: smallFontSize, font, color: rgb(0.5,0.5,0.5), opacity: 0.4 });
+
+        // Center watermark - diagonal with multiple layers
+        page.drawText(watermarkText, { x: centerX, y: centerY, size: centerFontSize, font, color: rgb(0.95,0.95,0.95), opacity: 0.03, rotate: degrees(45) });
+        page.drawText(watermarkText, { x: centerX, y: centerY, size: centerFontSize, font, color: rgb(0.8,0.8,0.8), opacity: 0.08, rotate: degrees(45) });
+        page.drawText(watermarkText, { x: centerX, y: centerY, size: centerFontSize, font, color: rgb(0.6,0.6,0.6), opacity: 0.18, rotate: degrees(45) });
+
+        // Hidden forensic watermarks
+        page.drawText(watermarkText, { x: centerX + 5, y: centerY + 5, size: centerFontSize - 2, font, color: rgb(0.98,0.98,0.98), opacity: 0.02, rotate: degrees(30) });
+        page.drawText(watermarkText, { x: centerX - 5, y: centerY - 5, size: centerFontSize - 2, font, color: rgb(0.98,0.98,0.98), opacity: 0.02, rotate: degrees(60) });
+      }
+
+      // Determine safe output name
+      const orig = displayName || (path.split('/').pop() || 'document.pdf');
+      const safeOriginal = sanitizeFileName(orig);
+      const base = safeOriginal.replace(/\.pdf$/i, '');
+      const processedFileName = `${base}_${userId}.pdf`;
+
+      // Upload processed file
+      const processedPath = `processed/${processedFileName}`;
+      const processedPdfBytes = await pdfDoc.save();
+      const { error: uploadError } = await supabase.storage
+        .from("pdf-files")
+        .upload(processedPath, processedPdfBytes, { contentType: "application/pdf", upsert: true });
+      if (uploadError) {
+        throw new Error(`Failed to upload processed file: ${uploadError.message}`);
+      }
+
+      return processedPath;
+    };
+
+    let filesOut: { originalId?: string; processedId: string }[] = [];
+
+    if (Array.isArray(body.fileIds)) {
+      for (const fp of body.fileIds as string[]) {
+        try {
+          const processedId = await processOne(fp);
+          filesOut.push({ originalId: fp, processedId });
+        } catch (err) {
+          console.error('Error processing file', fp, err);
         }
-      );
+      }
+    } else if (body.filePath) {
+      const processedId = await processOne(body.filePath, body.fileName);
+      filesOut.push({ processedId });
+    } else {
+      return new Response(JSON.stringify({ error: 'No files provided' }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
     }
 
-    // Load PDF
-    const pdfBytes = await fileData.arrayBuffer();
-    const pdfDoc = await PDFDocument.load(pdfBytes);
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-
-    // Add metadata watermark (hidden but traceable)
-    pdfDoc.setTitle(`Protected Document - ${userId}`);
-    pdfDoc.setAuthor(email);
-    pdfDoc.setSubject(`User: ${userId} | Email: ${email}`);
-    pdfDoc.setKeywords([email, userId, 'protected', 'watermarked']);
-    pdfDoc.setProducer(`David's PDF System - User: ${userId}`);
-    pdfDoc.setCreator(`Watermarked for ${email}`);
-
-    // Add watermark to each page
-    const pages = pdfDoc.getPages();
-    const watermarkText = `${email} | ID: ${userId}`;
-
-    for (const page of pages) {
-      const { width, height } = page.getSize();
-      const smallFontSize = 10;
-      const centerFontSize = 20;
-      const smallTextWidth = font.widthOfTextAtSize(watermarkText, smallFontSize);
-      const centerTextWidth = font.widthOfTextAtSize(watermarkText, centerFontSize);
-
-      const topX = width - smallTextWidth - 15;
-      const topY = height - 20;
-      const bottomX = 15;
-      const bottomY = 15;
-      const centerX = (width / 2) - (centerTextWidth / 2);
-      const centerY = (height / 2) - 30;
-
-      // Top watermark - multiple layers
-      page.drawText(watermarkText, {
-        x: topX,
-        y: topY,
-        size: smallFontSize,
-        font: font,
-        color: rgb(0.9, 0.9, 0.9),
-        opacity: 0.05,
-      });
-      
-      page.drawText(watermarkText, {
-        x: topX,
-        y: topY,
-        size: smallFontSize,
-        font: font,
-        color: rgb(0.7, 0.7, 0.7),
-        opacity: 0.15,
-      });
-      
-      page.drawText(watermarkText, {
-        x: topX,
-        y: topY,
-        size: smallFontSize,
-        font: font,
-        color: rgb(0.5, 0.5, 0.5),
-        opacity: 0.4,
-      });
-
-      // Bottom watermark - multiple layers
-      page.drawText(watermarkText, {
-        x: bottomX,
-        y: bottomY,
-        size: smallFontSize,
-        font: font,
-        color: rgb(0.9, 0.9, 0.9),
-        opacity: 0.05,
-      });
-      
-      page.drawText(watermarkText, {
-        x: bottomX,
-        y: bottomY,
-        size: smallFontSize,
-        font: font,
-        color: rgb(0.7, 0.7, 0.7),
-        opacity: 0.15,
-      });
-      
-      page.drawText(watermarkText, {
-        x: bottomX,
-        y: bottomY,
-        size: smallFontSize,
-        font: font,
-        color: rgb(0.5, 0.5, 0.5),
-        opacity: 0.4,
-      });
-
-      // Center watermark - diagonal with multiple layers
-      page.drawText(watermarkText, {
-        x: centerX,
-        y: centerY,
-        size: centerFontSize,
-        font: font,
-        color: rgb(0.95, 0.95, 0.95),
-        opacity: 0.03,
-        rotate: degrees(45),
-      });
-      
-      page.drawText(watermarkText, {
-        x: centerX,
-        y: centerY,
-        size: centerFontSize,
-        font: font,
-        color: rgb(0.8, 0.8, 0.8),
-        opacity: 0.08,
-        rotate: degrees(45),
-      });
-      
-      page.drawText(watermarkText, {
-        x: centerX,
-        y: centerY,
-        size: centerFontSize,
-        font: font,
-        color: rgb(0.6, 0.6, 0.6),
-        opacity: 0.18,
-        rotate: degrees(45),
-      });
-
-      // Hidden forensic watermarks
-      page.drawText(watermarkText, {
-        x: centerX + 5,
-        y: centerY + 5,
-        size: centerFontSize - 2,
-        font: font,
-        color: rgb(0.98, 0.98, 0.98),
-        opacity: 0.02,
-        rotate: degrees(30),
-      });
-      
-      page.drawText(watermarkText, {
-        x: centerX - 5,
-        y: centerY - 5,
-        size: centerFontSize - 2,
-        font: font,
-        color: rgb(0.98, 0.98, 0.98),
-        opacity: 0.02,
-        rotate: degrees(60),
-      });
-    }
-
-// Save processed PDF with original name + userId (sanitized)
-const processedPdfBytes = await pdfDoc.save();
-const safeOriginal = sanitizeFileName(fileName || 'document.pdf');
-const base = safeOriginal.replace(/\.pdf$/i, '');
-const processedFileName = `${base}_${userId}.pdf`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("pdf-files")
-      .upload(`processed/${processedFileName}`, processedPdfBytes, {
-        contentType: "application/pdf",
-        upsert: true,
-      });
-
-    if (uploadError) {
-      console.error("Error uploading processed file:", uploadError);
-      return new Response(
-        JSON.stringify({ error: `Failed to upload processed file: ${uploadError.message}` }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 500,
-        }
-      );
-    }
-
-    const fileId = `processed/${processedFileName}`;
-    console.log("Processed file:", fileId);
-
-    return new Response(JSON.stringify({ success: true, fileId }), {
+    return new Response(JSON.stringify({ success: true, files: filesOut }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });

@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FileUploadZone } from "@/components/FileUploadZone";
 import { FileList, FileItem } from "@/components/FileList";
 import { WatermarkForm } from "@/components/WatermarkForm";
 import { TemplateManager } from "@/components/TemplateManager";
 import { BatchEmailImport, RecipientData } from "@/components/BatchEmailImport";
 import { FileRequestsManager } from "@/components/FileRequestsManager";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -33,7 +34,22 @@ const Index = () => {
   const [sendWithoutWatermark, setSendWithoutWatermark] = useState(false);
   const [recipients, setRecipients] = useState<RecipientData[]>([]);
   const [batchProcessedFiles, setBatchProcessedFiles] = useState<Map<string, string[]>>(new Map());
-  const { toast } = useToast();
+const { toast } = useToast();
+
+  const [activeTab, setActiveTab] = useState<"single" | "batch" | "requests">("single");
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    const emailParam = searchParams.get('email');
+    const idParam = searchParams.get('id');
+
+    if (tabParam === 'single' || tabParam === 'batch' || tabParam === 'requests') {
+      setActiveTab(tabParam);
+    }
+    if (emailParam) setEmail(emailParam);
+    if (idParam) setUserId(idParam);
+  }, [searchParams]);
 
   const handleFilesSelected = (newFiles: File[]) => {
     const fileItems: FileItem[] = newFiles.map((file) => ({
@@ -651,7 +667,7 @@ ${links.map((l) => {
 
           {/* Main Card with Tabs */}
           <Card className="p-8 shadow-lg border-border/50">
-            <Tabs defaultValue="single" dir="rtl">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "single" | "batch" | "requests")} dir="rtl">
               <TabsList className="grid w-full grid-cols-3 mb-8">
                 <TabsTrigger value="single" className="flex items-center gap-2">
                   <User className="w-4 h-4" />

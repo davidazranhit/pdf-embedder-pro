@@ -11,16 +11,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Send, Filter } from "lucide-react";
-import { TemplateManager } from "./TemplateManager";
+import { useNavigate } from "react-router-dom";
+// TemplateManager removed in simplified flow
 
 interface FileRequest {
   id: string;
@@ -31,24 +25,14 @@ interface FileRequest {
   sent_date: string | null;
 }
 
-interface Template {
-  id: string;
-  name: string;
-  file_path: string;
-  file_size: number;
-  created_at: string;
-  category: string;
-}
 
 export const FileRequestsManager = () => {
   const [requests, setRequests] = useState<FileRequest[]>([]);
   const [filteredRequests, setFilteredRequests] = useState<FileRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedRequest, setSelectedRequest] = useState<FileRequest | null>(null);
-  const [selectedTemplates, setSelectedTemplates] = useState<Template[]>([]);
-  const [isSending, setIsSending] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "sent">("all");
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchRequests();
@@ -82,74 +66,30 @@ export const FileRequestsManager = () => {
     setIsLoading(false);
   };
 
-  const handleSendFiles = async () => {
-    if (!selectedRequest || selectedTemplates.length === 0) {
-      toast({
-        title: "שגיאה",
-        description: "אנא בחר תבניות לשליחה",
-        variant: "destructive",
-      });
+  const handleGoToSingleUser = (request: FileRequest) => {
+    // Navigate to main screen with prefilled params
+    const url = `/?tab=single&email=${encodeURIComponent(request.email)}&id=${encodeURIComponent(request.id_number)}`;
+    navigate(url);
+  };
+
+  const toggleStatus = async (request: FileRequest) => {
+    const newStatus = request.status === "sent" ? "pending" : "sent";
+    const { error } = await supabase
+      .from("file_requests")
+      .update({
+        status: newStatus,
+        sent_date: newStatus === "sent" ? new Date().toISOString() : null,
+      })
+      .eq("id", request.id);
+
+    if (error) {
+      console.error("Error updating status:", error);
+      toast({ title: "שגיאה", description: "לא ניתן לעדכן סטטוס", variant: "destructive" });
       return;
     }
 
-    setIsSending(true);
-
-    try {
-      // Process watermarks
-      const processedFileIds: string[] = [];
-      
-      for (const template of selectedTemplates) {
-        const { data, error } = await supabase.functions.invoke("process-watermark", {
-          body: {
-            filePath: template.file_path,
-            email: selectedRequest.email,
-            userId: selectedRequest.id_number,
-            fileName: template.name,
-          },
-        });
-
-        if (error) throw error;
-        if (data?.fileId) {
-          processedFileIds.push(data.fileId);
-        }
-      }
-
-      // Send via email
-      const { error: sendError } = await supabase.functions.invoke("send-watermarked-files", {
-        body: {
-          email: selectedRequest.email,
-          fileIds: processedFileIds,
-        },
-      });
-
-      if (sendError) throw sendError;
-
-      // Update request status
-      const { error: updateError } = await supabase
-        .from("file_requests")
-        .update({ status: "sent", sent_date: new Date().toISOString() })
-        .eq("id", selectedRequest.id);
-
-      if (updateError) throw updateError;
-
-      toast({
-        title: "הקבצים נשלחו בהצלחה",
-        description: `הקבצים נשלחו ל-${selectedRequest.email}`,
-      });
-
-      setSelectedRequest(null);
-      setSelectedTemplates([]);
-      fetchRequests();
-    } catch (error) {
-      console.error("Error sending files:", error);
-      toast({
-        title: "שגיאה",
-        description: "לא ניתן לשלוח את הקבצים",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSending(false);
-    }
+    setRequests((prev) => prev.map((r) => r.id === request.id ? { ...r, status: newStatus, sent_date: newStatus === "sent" ? new Date().toISOString() : null } : r));
+    toast({ title: "עודכן", description: newStatus === "sent" ? "סומן כטופל" : "סומן כלא טופל" });
   };
 
   const formatDate = (dateString: string) => {
@@ -176,8 +116,8 @@ export const FileRequestsManager = () => {
                 className="px-3 py-1.5 border rounded-lg bg-background text-sm"
               >
                 <option value="all">הכל</option>
-                <option value="pending">ממתין</option>
-                <option value="sent">נשלח</option>
+                <option value="pending">לא טופל</option>
+                <option value="sent">טופל</option>
               </select>
             </div>
           </div>
@@ -211,23 +151,23 @@ export const FileRequestsManager = () => {
                         <Badge
                           variant={request.status === "sent" ? "default" : "secondary"}
                         >
-                          {request.status === "sent" ? "נשלח" : "ממתין"}
+                          {request.status === "sent" ? "טופל" : "לא טופל"}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {request.status === "pending" && (
-                          <Button
-                            size="sm"
-                            onClick={() => setSelectedRequest(request)}
-                          >
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" onClick={() => handleGoToSingleUser(request)}>
                             <Send className="w-4 h-4 ml-2" />
                             שלח קבצים
                           </Button>
-                        )}
+                          <Button size="sm" variant="outline" onClick={() => toggleStatus(request)}>
+                            {request.status === "sent" ? "סמן לא טופל" : "סמן טופל"}
+                          </Button>
+                        </div>
                         {request.status === "sent" && request.sent_date && (
-                          <span className="text-xs text-muted-foreground">
+                          <div className="text-xs text-muted-foreground mt-1">
                             נשלח ב-{formatDate(request.sent_date)}
-                          </span>
+                          </div>
                         )}
                       </TableCell>
                     </TableRow>
@@ -239,45 +179,6 @@ export const FileRequestsManager = () => {
         </div>
       </Card>
 
-      <Dialog open={!!selectedRequest} onOpenChange={(open) => !open && setSelectedRequest(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>שליחת קבצים</DialogTitle>
-            <DialogDescription>
-              בחר תבניות לשליחה עבור {selectedRequest?.email}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <TemplateManager
-              onTemplateSelect={setSelectedTemplates}
-              selectedTemplates={selectedTemplates}
-            />
-
-            <div className="flex items-center justify-between pt-4 border-t">
-              <p className="text-sm text-muted-foreground">
-                {selectedTemplates.length} תבניות נבחרו
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setSelectedRequest(null)}
-                  disabled={isSending}
-                >
-                  ביטול
-                </Button>
-                <Button
-                  onClick={handleSendFiles}
-                  disabled={isSending || selectedTemplates.length === 0}
-                >
-                  <Send className="w-4 h-4 ml-2" />
-                  {isSending ? "שולח..." : "שלח קבצים"}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </>
   );
 };
