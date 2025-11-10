@@ -7,11 +7,33 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+
 interface WatermarkRequest {
   filePath: string;
   email: string;
   userId: string;
   fileName: string;
+}
+
+// Sanitize file names for storage keys (ASCII-only, safe characters)
+function sanitizeFileName(name: string) {
+  const extMatch = name.match(/\.([A-Za-z0-9]+)$/);
+  const ext = extMatch ? `.${extMatch[1].toLowerCase()}` : '.pdf';
+  const base = name.replace(/\.[^/.]+$/, "");
+
+  const safeBase = base
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\x00-\x7F]/g, '')
+    .replace(/[<>:"/\\|?*\x00-\x1f\s]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  if (!safeBase) {
+    const unique = Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    return `file-${unique}${ext}`;
+  }
+  return `${safeBase}${ext}`;
 }
 
 serve(async (req) => {
@@ -184,10 +206,11 @@ serve(async (req) => {
       });
     }
 
-    // Save processed PDF with original name + userId
-    const processedPdfBytes = await pdfDoc.save();
-    const fileNameWithoutExt = fileName.replace(/\.pdf$/i, '');
-    const processedFileName = `${fileNameWithoutExt}_${userId}.pdf`;
+// Save processed PDF with original name + userId (sanitized)
+const processedPdfBytes = await pdfDoc.save();
+const safeOriginal = sanitizeFileName(fileName || 'document.pdf');
+const base = safeOriginal.replace(/\.pdf$/i, '');
+const processedFileName = `${base}_${userId}.pdf`;
 
     const { error: uploadError } = await supabase.storage
       .from("pdf-files")
