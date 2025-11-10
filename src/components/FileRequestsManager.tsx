@@ -69,7 +69,7 @@ export const FileRequestsManager = () => {
 
   const handleGoToSingleUser = (request: FileRequest) => {
     // Navigate to main screen with prefilled params
-    const url = `/?tab=single&email=${encodeURIComponent(request.email)}&id=${encodeURIComponent(request.id_number)}`;
+    const url = `/sys-admin?tab=single&email=${encodeURIComponent(request.email)}&id=${encodeURIComponent(request.id_number)}`;
     navigate(url);
   };
 

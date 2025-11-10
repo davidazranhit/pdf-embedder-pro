@@ -18,7 +18,7 @@ export const Login = () => {
     // Check if already logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        navigate("/");
+        navigate("/sys-admin");
       }
     });
   }, [navigate]);
@@ -42,7 +42,7 @@ export const Login = () => {
         return;
       }
 
-      navigate("/");
+      navigate("/sys-admin");
     } catch (error) {
       console.error("Login error:", error);
       toast({

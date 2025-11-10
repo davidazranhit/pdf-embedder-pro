@@ -38,7 +38,7 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   }
 
   if (!session) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/sys-admin/login" replace />;
   }
 
   return <>{children}</>;

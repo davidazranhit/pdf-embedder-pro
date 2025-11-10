@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { validateIsraeliID } from "@/lib/idValidation";
 import { FileText, Send } from "lucide-react";
 
 const FileRequest = () => {
@@ -21,6 +22,16 @@ const FileRequest = () => {
       toast({
         title: "שגיאה",
         description: "אנא מלא את כל השדות",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate Israeli ID
+    if (!validateIsraeliID(idNumber)) {
+      toast({
+        title: "תעודת זהות שגויה",
+        description: "אנא הזן תעודת זהות ישראלית תקינה (9 ספרות)",
         variant: "destructive",
       });
       return;

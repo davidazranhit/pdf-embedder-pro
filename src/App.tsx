@@ -18,10 +18,10 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/login" element={<Login />} />
           <Route path="/request-access" element={<FileRequest />} />
+          <Route path="/sys-admin/login" element={<Login />} />
           <Route
-            path="/"
+            path="/sys-admin"
             element={
               <ProtectedRoute>
                 <Index />

@@ -20,7 +20,7 @@ export const LogoutButton = () => {
       return;
     }
 
-    navigate("/login");
+    navigate("/sys-admin/login");
   };
 
   return (
