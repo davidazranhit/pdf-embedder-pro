@@ -11,29 +11,67 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isChecked, setIsChecked] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     let mounted = true;
 
-    // Check for existing session first
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (mounted) {
-        setSession(session);
-        setIsLoading(false);
-        setIsChecked(true);
-      }
-    });
+    const verify = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!mounted) return;
 
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        if (mounted) {
-          setSession(session);
-          setIsLoading(false);
+        if (!session) {
+          setSession(null);
+          setIsAuthenticated(false);
           setIsChecked(true);
+          setIsLoading(false);
+          return;
+        }
+
+        // Server-verify token is valid (prevents stale local sessions)
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError || !userData?.user) {
+          await supabase.auth.signOut({ scope: 'local' });
+          setSession(null);
+          setIsAuthenticated(false);
+        } else {
+          setSession(session);
+          setIsAuthenticated(true);
+        }
+      } catch {
+        setSession(null);
+        setIsAuthenticated(false);
+      } finally {
+        if (mounted) {
+          setIsChecked(true);
+          setIsLoading(false);
         }
       }
-    );
+    };
+
+    verify();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+
+      if (event === 'SIGNED_OUT' || !session) {
+        setSession(null);
+        setIsAuthenticated(false);
+        return;
+      }
+
+      // On sign in, validate with server
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData?.user) {
+        await supabase.auth.signOut({ scope: 'local' });
+        setSession(null);
+        setIsAuthenticated(false);
+      } else {
+        setSession(session);
+        setIsAuthenticated(true);
+      }
+    });
 
     return () => {
       mounted = false;
@@ -41,7 +79,6 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     };
   }, []);
 
-  // Show loading only if we haven't checked yet
   if (isLoading || !isChecked) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -50,8 +87,7 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     );
   }
 
-  // Redirect to login if no session
-  if (!session) {
+  if (!isAuthenticated) {
     return <Navigate to="/sys-admin/login" replace />;
   }
 

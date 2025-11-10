@@ -15,12 +15,15 @@ export const Login = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check if already logged in
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
+    let mounted = true;
+    // Verify user server-side to avoid stale local sessions
+    supabase.auth.getUser().then(({ data, error }) => {
+      if (!mounted) return;
+      if (data?.user && !error) {
         navigate("/sys-admin");
       }
     });
+    return () => { mounted = false };
   }, [navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
