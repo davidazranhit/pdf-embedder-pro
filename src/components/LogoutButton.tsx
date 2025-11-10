@@ -9,18 +9,23 @@ export const LogoutButton = () => {
   const { toast } = useToast();
 
   const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
-    
-    if (error) {
-      toast({
-        title: "שגיאה",
-        description: "לא ניתן להתנתק",
-        variant: "destructive",
-      });
-      return;
-    }
+    try {
+      const { error } = await supabase.auth.signOut();
 
-    navigate("/sys-admin/login");
+      // If server says session not found, still clear locally and proceed
+      if (error && error.code !== 'session_not_found' && error.message !== 'No current session') {
+        toast({ title: 'שגיאה', description: 'לא ניתן להתנתק', variant: 'destructive' });
+        return;
+      }
+
+      // Ensure local session cleared regardless
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (e) {
+      // As a fallback, continue to login even if an error occurred
+      console.error('Logout error:', e);
+    } finally {
+      navigate('/sys-admin/login');
+    }
   };
 
   return (
