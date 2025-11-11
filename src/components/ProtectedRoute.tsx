@@ -58,6 +58,8 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       if (event === 'SIGNED_OUT' || !session) {
         setSession(null);
         setIsAuthenticated(false);
+        setIsChecked(true);
+        setIsLoading(false);
         return;
       }
 
@@ -67,9 +69,13 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         await supabase.auth.signOut({ scope: 'local' });
         setSession(null);
         setIsAuthenticated(false);
+        setIsChecked(true);
+        setIsLoading(false);
       } else {
         setSession(session);
         setIsAuthenticated(true);
+        setIsChecked(true);
+        setIsLoading(false);
       }
     });
 
