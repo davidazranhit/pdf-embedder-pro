@@ -52,7 +52,7 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
     verify();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
 
       if (event === 'SIGNED_OUT' || !session) {
@@ -63,20 +63,11 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         return;
       }
 
-      // On sign in, validate with server
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError || !userData?.user) {
-        await supabase.auth.signOut({ scope: 'local' });
-        setSession(null);
-        setIsAuthenticated(false);
-        setIsChecked(true);
-        setIsLoading(false);
-      } else {
-        setSession(session);
-        setIsAuthenticated(true);
-        setIsChecked(true);
-        setIsLoading(false);
-      }
+      // On sign in, only update local state; server validation is handled separately
+      setSession(session);
+      setIsAuthenticated(true);
+      setIsChecked(true);
+      setIsLoading(false);
     });
 
     return () => {

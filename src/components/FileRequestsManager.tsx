@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import {
   Table,
@@ -31,7 +32,8 @@ export const FileRequestsManager = () => {
   const [requests, setRequests] = useState<FileRequest[]>([]);
   const [filteredRequests, setFilteredRequests] = useState<FileRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "sent">("all");
+const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "sent">("all");
+  const [search, setSearch] = useState("");
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -39,13 +41,16 @@ export const FileRequestsManager = () => {
     fetchRequests();
   }, []);
 
-  useEffect(() => {
-    if (statusFilter === "all") {
-      setFilteredRequests(requests);
-    } else {
-      setFilteredRequests(requests.filter((r) => r.status === statusFilter));
+useEffect(() => {
+    let base = statusFilter === "all" ? requests : requests.filter((r) => r.status === statusFilter);
+    const q = search.trim().toLowerCase();
+    if (q) {
+      base = base.filter((r) =>
+        r.email.toLowerCase().includes(q) || r.id_number.toLowerCase().includes(q)
+      );
     }
-  }, [statusFilter, requests]);
+    setFilteredRequests(base);
+  }, [statusFilter, requests, search]);
 
   const fetchRequests = async () => {
     setIsLoading(true);
@@ -109,18 +114,24 @@ export const FileRequestsManager = () => {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-semibold text-foreground">בקשות לקבצים</h3>
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-muted-foreground" />
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="px-3 py-1.5 border rounded-lg bg-background text-sm"
-              >
-                <option value="all">הכל</option>
-                <option value="pending">לא טופל</option>
-                <option value="sent">טופל</option>
-              </select>
-            </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="חיפוש לפי ת.ז או מייל"
+                  className="max-w-[220px]"
+                />
+                <Filter className="w-4 h-4 text-muted-foreground" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                  className="px-3 py-1.5 border rounded-lg bg-background text-sm"
+                >
+                  <option value="all">הכל</option>
+                  <option value="pending">לא טופל</option>
+                  <option value="sent">טופל</option>
+                </select>
+              </div>
           </div>
 
           {isLoading ? (
