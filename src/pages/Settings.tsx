@@ -28,6 +28,12 @@ const Settings = () => {
   const [fontSize, setFontSize] = useState<number>(10);
   const [opacity, setOpacity] = useState<number>(0.4);
   const [centerRotation, setCenterRotation] = useState<number>(45);
+  const [hiddenEnabled, setHiddenEnabled] = useState<boolean>(true);
+  const [hiddenFontSize, setHiddenFontSize] = useState<number>(24);
+  const [hiddenOpacity, setHiddenOpacity] = useState<number>(0.12);
+  const [hiddenRowSpacing, setHiddenRowSpacing] = useState<number>(15);
+  const [hiddenColSpacing, setHiddenColSpacing] = useState<number>(10);
+  const [showHiddenPreview, setShowHiddenPreview] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
@@ -51,6 +57,11 @@ const Settings = () => {
         setFontSize(data.font_size);
         setOpacity(Number(data.opacity));
         setCenterRotation(data.center_rotation);
+        setHiddenEnabled(data.hidden_watermark_enabled ?? true);
+        setHiddenFontSize(data.hidden_watermark_font_size ?? 24);
+        setHiddenOpacity(Number(data.hidden_watermark_opacity ?? 0.12));
+        setHiddenRowSpacing(data.hidden_watermark_row_spacing ?? 15);
+        setHiddenColSpacing(data.hidden_watermark_col_spacing ?? 10);
       }
     } catch (error) {
       console.error("Error loading settings:", error);
@@ -90,6 +101,11 @@ const Settings = () => {
           font_size: fontSize,
           opacity: opacity,
           center_rotation: centerRotation,
+          hidden_watermark_enabled: hiddenEnabled,
+          hidden_watermark_font_size: hiddenFontSize,
+          hidden_watermark_opacity: hiddenOpacity,
+          hidden_watermark_row_spacing: hiddenRowSpacing,
+          hidden_watermark_col_spacing: hiddenColSpacing,
         })
         .eq("id", "00000000-0000-0000-0000-000000000001");
 
@@ -247,6 +263,89 @@ const Settings = () => {
                   />
                 </div>
 
+                {/* Hidden Watermarks Section */}
+                <div className="pt-6 border-t border-border">
+                  <h3 className="text-xl font-semibold mb-4 text-foreground">
+                    Watermarks נסתרים
+                  </h3>
+                  
+                  {/* Enable/Disable Hidden Watermarks */}
+                  <div className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-muted/30 transition-colors mb-4">
+                    <span className="text-foreground">הפעל Watermarks נסתרים</span>
+                    <Button
+                      variant={hiddenEnabled ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setHiddenEnabled(!hiddenEnabled)}
+                    >
+                      {hiddenEnabled ? "מופעל" : "כבוי"}
+                    </Button>
+                  </div>
+
+                  {hiddenEnabled && (
+                    <>
+                      {/* Hidden Font Size */}
+                      <div className="space-y-3 mb-6">
+                        <Label className="text-base font-medium">
+                          גודל גופן נסתר: {hiddenFontSize}
+                        </Label>
+                        <Slider
+                          value={[hiddenFontSize]}
+                          onValueChange={(val) => setHiddenFontSize(val[0])}
+                          min={16}
+                          max={32}
+                          step={2}
+                          className="w-full"
+                        />
+                      </div>
+
+                      {/* Hidden Opacity */}
+                      <div className="space-y-3 mb-6">
+                        <Label className="text-base font-medium">
+                          שקיפות נסתרת: {Math.round(hiddenOpacity * 100)}%
+                        </Label>
+                        <Slider
+                          value={[hiddenOpacity * 100]}
+                          onValueChange={(val) => setHiddenOpacity(val[0] / 100)}
+                          min={5}
+                          max={20}
+                          step={1}
+                          className="w-full"
+                        />
+                      </div>
+
+                      {/* Hidden Row Spacing */}
+                      <div className="space-y-3 mb-6">
+                        <Label className="text-base font-medium">
+                          מרווח שורות: {hiddenRowSpacing}
+                        </Label>
+                        <Slider
+                          value={[hiddenRowSpacing]}
+                          onValueChange={(val) => setHiddenRowSpacing(val[0])}
+                          min={10}
+                          max={30}
+                          step={1}
+                          className="w-full"
+                        />
+                      </div>
+
+                      {/* Hidden Column Spacing */}
+                      <div className="space-y-3 mb-6">
+                        <Label className="text-base font-medium">
+                          מרווח עמודות: {hiddenColSpacing}
+                        </Label>
+                        <Slider
+                          value={[hiddenColSpacing]}
+                          onValueChange={(val) => setHiddenColSpacing(val[0])}
+                          min={5}
+                          max={20}
+                          step={1}
+                          className="w-full"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+
                 {/* Save Button */}
                 <Button
                   onClick={saveSettings}
@@ -261,9 +360,21 @@ const Settings = () => {
             {/* Preview Panel */}
             <Card className="p-8 shadow-lg border-border/50">
               <div>
-                <h2 className="text-2xl font-semibold mb-6 text-foreground">
-                  תצוגה מקדימה
-                </h2>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-semibold text-foreground">
+                    תצוגה מקדימה
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm text-foreground">הצג נסתרים</Label>
+                    <Button
+                      variant={showHiddenPreview ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setShowHiddenPreview(!showHiddenPreview)}
+                    >
+                      {showHiddenPreview ? "מוצג" : "מוסתר"}
+                    </Button>
+                  </div>
+                </div>
                 <div className="relative border-2 border-border rounded-lg bg-white aspect-[3/4] overflow-hidden">
                   {/* Sample PDF Content */}
                   <div className="p-8 text-gray-800">
@@ -279,7 +390,7 @@ const Settings = () => {
                     </p>
                   </div>
 
-                  {/* Watermarks Preview */}
+                  {/* Visible Watermarks Preview */}
                   {watermarkPositions.map(
                     (pos) =>
                       pos.enabled && (
@@ -291,6 +402,42 @@ const Settings = () => {
                         </div>
                       )
                   )}
+
+                  {/* Hidden Watermarks Preview */}
+                  {hiddenEnabled && showHiddenPreview && (() => {
+                    const previewWidth = 600; // Approximate width for calculation
+                    const previewHeight = 800; // Approximate height for calculation
+                    const emailPrefix = "example";
+                    const textWidth = emailPrefix.length * hiddenFontSize * 0.6;
+                    const repeatsPerRow = Math.floor(previewWidth / (textWidth + hiddenColSpacing));
+                    const hiddenWatermarks = [];
+
+                    for (let row = 0; row < hiddenRowSpacing; row++) {
+                      const y = (previewHeight * ((row + 1) / (hiddenRowSpacing + 1))) / previewHeight * 100;
+                      
+                      for (let col = 0; col < repeatsPerRow; col++) {
+                        const x = (col * (textWidth + hiddenColSpacing) + 10) / previewWidth * 100;
+                        hiddenWatermarks.push(
+                          <div
+                            key={`hidden-${row}-${col}`}
+                            style={{
+                              position: "absolute",
+                              top: `${y}%`,
+                              left: `${x}%`,
+                              fontSize: `${hiddenFontSize}px`,
+                              opacity: showHiddenPreview ? 0.5 : hiddenOpacity,
+                              color: "#aaa",
+                              pointerEvents: "none",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {emailPrefix}
+                          </div>
+                        );
+                      }
+                    }
+                    return hiddenWatermarks;
+                  })()}
                 </div>
                 <p className="text-sm text-muted-foreground mt-4 text-center">
                   זוהי תצוגה מקדימה בלבד. ה-Watermarks בקובץ ה-PDF האמיתי יהיו זהים.

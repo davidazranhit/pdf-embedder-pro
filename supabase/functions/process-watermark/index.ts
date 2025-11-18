@@ -73,7 +73,12 @@ serve(async (req) => {
       ],
       font_size: 10,
       opacity: 0.4,
-      center_rotation: 45
+      center_rotation: 45,
+      hidden_watermark_enabled: true,
+      hidden_watermark_font_size: 24,
+      hidden_watermark_opacity: 0.12,
+      hidden_watermark_row_spacing: 15,
+      hidden_watermark_col_spacing: 10
     };
 
     // Helper to process a single file path and return processedId
@@ -111,7 +116,11 @@ serve(async (req) => {
       const visibleFontSize = watermarkConfig.font_size;
       const visibleOpacity = watermarkConfig.opacity;
       const centerFontSize = visibleFontSize * 2;
-      const hiddenFontSize = 24;
+      const hiddenFontSize = watermarkConfig.hidden_watermark_font_size || 24;
+      const hiddenOpacity = watermarkConfig.hidden_watermark_opacity || 0.12;
+      const hiddenRowSpacing = watermarkConfig.hidden_watermark_row_spacing || 15;
+      const hiddenColSpacing = watermarkConfig.hidden_watermark_col_spacing || 10;
+      const hiddenEnabled = watermarkConfig.hidden_watermark_enabled !== false;
 
       for (const page of pages) {
         const { width, height } = page.getSize();
@@ -176,30 +185,32 @@ serve(async (req) => {
           });
         });
 
-        // Hidden forensic watermarks (always present, independent of visible settings)
-        const centerX = (width / 2) - (centerTextWidth / 2);
-        const centerY = (height / 2) - 80;
-        page.drawText(fullWatermarkText, { x: centerX + 5, y: centerY + 5, size: centerFontSize - 2, font, color: rgb(0.98,0.98,0.98), opacity: 0.02, rotate: degrees(30) });
-        page.drawText(fullWatermarkText, { x: centerX - 5, y: centerY - 5, size: centerFontSize - 2, font, color: rgb(0.98,0.98,0.98), opacity: 0.02, rotate: degrees(60) });
+        // Hidden forensic watermarks (only if enabled)
+        if (hiddenEnabled) {
+          const centerX = (width / 2) - (centerTextWidth / 2);
+          const centerY = (height / 2) - 80;
+          page.drawText(fullWatermarkText, { x: centerX + 5, y: centerY + 5, size: centerFontSize - 2, font, color: rgb(0.98,0.98,0.98), opacity: 0.02, rotate: degrees(30) });
+          page.drawText(fullWatermarkText, { x: centerX - 5, y: centerY - 5, size: centerFontSize - 2, font, color: rgb(0.98,0.98,0.98), opacity: 0.02, rotate: degrees(60) });
 
-        // Hidden watermarks in organized rows across the entire page
-        const numRows = 15; // Number of rows across the page
-        const repeatsPerRow = Math.floor(width / (hiddenTextWidth + 10)); // How many times the email fits per row
-        
-        for (let row = 0; row < numRows; row++) {
-          const y = height * ((row + 1) / (numRows + 1));
+          // Hidden watermarks in organized rows across the entire page
+          const numRows = hiddenRowSpacing;
+          const repeatsPerRow = Math.floor(width / (hiddenTextWidth + hiddenColSpacing));
           
-          // Draw the email multiple times in each row
-          for (let col = 0; col < repeatsPerRow; col++) {
-            const x = col * (hiddenTextWidth + 10) + 10;
-            page.drawText(emailPrefix, { 
-              x: x, 
-              y: y, 
-              size: hiddenFontSize, 
-              font, 
-              color: rgb(0.92,0.92,0.92), 
-              opacity: 0.12
-            });
+          for (let row = 0; row < numRows; row++) {
+            const y = height * ((row + 1) / (numRows + 1));
+            
+            // Draw the email multiple times in each row
+            for (let col = 0; col < repeatsPerRow; col++) {
+              const x = col * (hiddenTextWidth + hiddenColSpacing) + 10;
+              page.drawText(emailPrefix, { 
+                x: x, 
+                y: y, 
+                size: hiddenFontSize, 
+                font, 
+                color: rgb(0.92,0.92,0.92), 
+                opacity: hiddenOpacity
+              });
+            }
           }
         }
       }
