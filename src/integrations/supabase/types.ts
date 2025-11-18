@@ -127,14 +127,8 @@ export type Database = {
           center_rotation: number
           created_at: string | null
           font_size: number
-          hidden_watermark_col_spacing: number | null
-          hidden_watermark_enabled: boolean | null
-          hidden_watermark_font_size: number | null
-          hidden_watermark_opacity: number | null
-          hidden_watermark_row_spacing: number | null
           id: string
           opacity: number
-          position_settings: Json | null
           positions: Json
           updated_at: string | null
         }
@@ -142,14 +136,8 @@ export type Database = {
           center_rotation?: number
           created_at?: string | null
           font_size?: number
-          hidden_watermark_col_spacing?: number | null
-          hidden_watermark_enabled?: boolean | null
-          hidden_watermark_font_size?: number | null
-          hidden_watermark_opacity?: number | null
-          hidden_watermark_row_spacing?: number | null
           id?: string
           opacity?: number
-          position_settings?: Json | null
           positions?: Json
           updated_at?: string | null
         }
@@ -157,14 +145,8 @@ export type Database = {
           center_rotation?: number
           created_at?: string | null
           font_size?: number
-          hidden_watermark_col_spacing?: number | null
-          hidden_watermark_enabled?: boolean | null
-          hidden_watermark_font_size?: number | null
-          hidden_watermark_opacity?: number | null
-          hidden_watermark_row_spacing?: number | null
           id?: string
           opacity?: number
-          position_settings?: Json | null
           positions?: Json
           updated_at?: string | null
         }
