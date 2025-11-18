@@ -51,6 +51,31 @@ serve(async (req) => {
     const email: string = body.email;
     const userId: string = body.userId;
 
+    // Load watermark settings from database
+    const { data: settings, error: settingsError } = await supabase
+      .from("watermark_settings")
+      .select("*")
+      .eq("id", "00000000-0000-0000-0000-000000000001")
+      .single();
+
+    if (settingsError) {
+      console.error("Error loading watermark settings:", settingsError);
+      // Use default settings if load fails
+    }
+
+    const watermarkConfig = settings || {
+      positions: [
+        { type: "top-right", enabled: true },
+        { type: "top-left", enabled: false },
+        { type: "bottom-right", enabled: true },
+        { type: "bottom-left", enabled: true },
+        { type: "center", enabled: true }
+      ],
+      font_size: 10,
+      opacity: 0.4,
+      center_rotation: 45
+    };
+
     // Helper to process a single file path and return processedId
     const processOne = async (path: string, displayName?: string) => {
       console.log("Processing watermark for:", { filePath: path, email, userId, fileName: displayName });
@@ -82,38 +107,78 @@ serve(async (req) => {
       const fullWatermarkText = `${email} | ID: ${userId}`;
       const emailPrefix = email.split('@')[0]; // Extract email prefix only
 
+      // Get settings from config
+      const visibleFontSize = watermarkConfig.font_size;
+      const visibleOpacity = watermarkConfig.opacity;
+      const centerFontSize = visibleFontSize * 2;
+      const hiddenFontSize = 24;
+
       for (const page of pages) {
         const { width, height } = page.getSize();
-        const smallFontSize = 10;
-        const centerFontSize = 20;
-        const hiddenFontSize = 24; // Size that allows multiple repeats per line
-        const smallTextWidth = font.widthOfTextAtSize(fullWatermarkText, smallFontSize);
+        const smallTextWidth = font.widthOfTextAtSize(fullWatermarkText, visibleFontSize);
         const centerTextWidth = font.widthOfTextAtSize(fullWatermarkText, centerFontSize);
         const hiddenTextWidth = font.widthOfTextAtSize(emailPrefix, hiddenFontSize);
 
-        const topX = width - smallTextWidth - 15;
-        const topY = height - 20;
-        const bottomX = 15;
-        const bottomY = 15;
+        // Calculate positions based on enabled settings
+        const positions = watermarkConfig.positions || [];
+        
+        positions.forEach((pos: any) => {
+          if (!pos.enabled) return;
+
+          let x = 0, y = 0;
+          let size = visibleFontSize;
+          let rotation = 0;
+
+          switch (pos.type) {
+            case "top-right":
+              x = width - smallTextWidth - 15;
+              y = height - 20;
+              break;
+            case "top-left":
+              x = 15;
+              y = height - 20;
+              break;
+            case "bottom-right":
+              x = width - smallTextWidth - 15;
+              y = 15;
+              break;
+            case "bottom-left":
+              x = 15;
+              y = 15;
+              break;
+            case "center":
+              x = (width / 2) - (centerTextWidth / 2);
+              y = (height / 2) - 80;
+              size = centerFontSize;
+              rotation = watermarkConfig.center_rotation || 45;
+              break;
+          }
+
+          // Draw visible watermark with multiple layers for better visibility
+          const baseColor = 0.5;
+          page.drawText(fullWatermarkText, { 
+            x, y, size, font, 
+            color: rgb(0.9, 0.9, 0.9), 
+            opacity: visibleOpacity * 0.1, 
+            rotate: rotation ? degrees(rotation) : undefined 
+          });
+          page.drawText(fullWatermarkText, { 
+            x, y, size, font, 
+            color: rgb(0.7, 0.7, 0.7), 
+            opacity: visibleOpacity * 0.4, 
+            rotate: rotation ? degrees(rotation) : undefined 
+          });
+          page.drawText(fullWatermarkText, { 
+            x, y, size, font, 
+            color: rgb(baseColor, baseColor, baseColor), 
+            opacity: visibleOpacity, 
+            rotate: rotation ? degrees(rotation) : undefined 
+          });
+        });
+
+        // Hidden forensic watermarks (always present, independent of visible settings)
         const centerX = (width / 2) - (centerTextWidth / 2);
-        const centerY = (height / 2) - 80; // Lowered by 50 pixels
-
-        // Top watermark - multiple layers
-        page.drawText(fullWatermarkText, { x: topX, y: topY, size: smallFontSize, font, color: rgb(0.9,0.9,0.9), opacity: 0.05 });
-        page.drawText(fullWatermarkText, { x: topX, y: topY, size: smallFontSize, font, color: rgb(0.7,0.7,0.7), opacity: 0.15 });
-        page.drawText(fullWatermarkText, { x: topX, y: topY, size: smallFontSize, font, color: rgb(0.5,0.5,0.5), opacity: 0.4 });
-
-        // Bottom watermark - multiple layers
-        page.drawText(fullWatermarkText, { x: bottomX, y: bottomY, size: smallFontSize, font, color: rgb(0.9,0.9,0.9), opacity: 0.05 });
-        page.drawText(fullWatermarkText, { x: bottomX, y: bottomY, size: smallFontSize, font, color: rgb(0.7,0.7,0.7), opacity: 0.15 });
-        page.drawText(fullWatermarkText, { x: bottomX, y: bottomY, size: smallFontSize, font, color: rgb(0.5,0.5,0.5), opacity: 0.4 });
-
-        // Center watermark - diagonal with multiple layers
-        page.drawText(fullWatermarkText, { x: centerX, y: centerY, size: centerFontSize, font, color: rgb(0.95,0.95,0.95), opacity: 0.03, rotate: degrees(45) });
-        page.drawText(fullWatermarkText, { x: centerX, y: centerY, size: centerFontSize, font, color: rgb(0.8,0.8,0.8), opacity: 0.08, rotate: degrees(45) });
-        page.drawText(fullWatermarkText, { x: centerX, y: centerY, size: centerFontSize, font, color: rgb(0.6,0.6,0.6), opacity: 0.18, rotate: degrees(45) });
-
-        // Hidden forensic watermarks with email prefix only
+        const centerY = (height / 2) - 80;
         page.drawText(fullWatermarkText, { x: centerX + 5, y: centerY + 5, size: centerFontSize - 2, font, color: rgb(0.98,0.98,0.98), opacity: 0.02, rotate: degrees(30) });
         page.drawText(fullWatermarkText, { x: centerX - 5, y: centerY - 5, size: centerFontSize - 2, font, color: rgb(0.98,0.98,0.98), opacity: 0.02, rotate: degrees(60) });
 

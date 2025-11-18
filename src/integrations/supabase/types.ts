@@ -122,6 +122,36 @@ export type Database = {
         }
         Relationships: []
       }
+      watermark_settings: {
+        Row: {
+          center_rotation: number
+          created_at: string | null
+          font_size: number
+          id: string
+          opacity: number
+          positions: Json
+          updated_at: string | null
+        }
+        Insert: {
+          center_rotation?: number
+          created_at?: string | null
+          font_size?: number
+          id?: string
+          opacity?: number
+          positions?: Json
+          updated_at?: string | null
+        }
+        Update: {
+          center_rotation?: number
+          created_at?: string | null
+          font_size?: number
+          id?: string
+          opacity?: number
+          positions?: Json
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
