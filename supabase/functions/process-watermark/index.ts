@@ -86,9 +86,10 @@ serve(async (req) => {
         const { width, height } = page.getSize();
         const smallFontSize = 10;
         const centerFontSize = 20;
-        const hiddenFontSize = 160; // Very large hidden watermarks for easy detection
+        const hiddenFontSize = 24; // Size that allows multiple repeats per line
         const smallTextWidth = font.widthOfTextAtSize(fullWatermarkText, smallFontSize);
         const centerTextWidth = font.widthOfTextAtSize(fullWatermarkText, centerFontSize);
+        const hiddenTextWidth = font.widthOfTextAtSize(emailPrefix, hiddenFontSize);
 
         const topX = width - smallTextWidth - 15;
         const topY = height - 20;
@@ -116,24 +117,25 @@ serve(async (req) => {
         page.drawText(fullWatermarkText, { x: centerX + 5, y: centerY + 5, size: centerFontSize - 2, font, color: rgb(0.98,0.98,0.98), opacity: 0.02, rotate: degrees(30) });
         page.drawText(fullWatermarkText, { x: centerX - 5, y: centerY - 5, size: centerFontSize - 2, font, color: rgb(0.98,0.98,0.98), opacity: 0.02, rotate: degrees(60) });
 
-        // Large hidden watermarks arranged in rows across the entire page
-        const numRows = 6; // Number of rows across the page
-        const angles = [15, -15, 10, -10, 20, -20];
+        // Hidden watermarks in organized rows across the entire page
+        const numRows = 15; // Number of rows across the page
+        const repeatsPerRow = Math.floor(width / (hiddenTextWidth + 10)); // How many times the email fits per row
         
         for (let row = 0; row < numRows; row++) {
           const y = height * ((row + 1) / (numRows + 1));
-          const angle = angles[row % angles.length];
           
-          // Draw large watermark text across the width of the page
-          page.drawText(emailPrefix, { 
-            x: width * 0.1, 
-            y: y, 
-            size: hiddenFontSize, 
-            font, 
-            color: rgb(0.92,0.92,0.92), 
-            opacity: 0.12, 
-            rotate: degrees(angle) 
-          });
+          // Draw the email multiple times in each row
+          for (let col = 0; col < repeatsPerRow; col++) {
+            const x = col * (hiddenTextWidth + 10) + 10;
+            page.drawText(emailPrefix, { 
+              x: x, 
+              y: y, 
+              size: hiddenFontSize, 
+              font, 
+              color: rgb(0.92,0.92,0.92), 
+              opacity: 0.12
+            });
+          }
         }
       }
 
