@@ -79,40 +79,69 @@ serve(async (req) => {
 
       // Add watermark to each page
       const pages = pdfDoc.getPages();
-      const watermarkText = `${email} | ID: ${userId}`;
+      const fullWatermarkText = `${email} | ID: ${userId}`;
+      const emailPrefix = email.split('@')[0]; // Extract email prefix only
 
       for (const page of pages) {
         const { width, height } = page.getSize();
         const smallFontSize = 10;
         const centerFontSize = 20;
-        const smallTextWidth = font.widthOfTextAtSize(watermarkText, smallFontSize);
-        const centerTextWidth = font.widthOfTextAtSize(watermarkText, centerFontSize);
+        const hiddenFontSize = 8;
+        const smallTextWidth = font.widthOfTextAtSize(fullWatermarkText, smallFontSize);
+        const centerTextWidth = font.widthOfTextAtSize(fullWatermarkText, centerFontSize);
 
         const topX = width - smallTextWidth - 15;
         const topY = height - 20;
         const bottomX = 15;
         const bottomY = 15;
         const centerX = (width / 2) - (centerTextWidth / 2);
-        const centerY = (height / 2) - 30;
+        const centerY = (height / 2) - 80; // Lowered by 50 pixels
 
         // Top watermark - multiple layers
-        page.drawText(watermarkText, { x: topX, y: topY, size: smallFontSize, font, color: rgb(0.9,0.9,0.9), opacity: 0.05 });
-        page.drawText(watermarkText, { x: topX, y: topY, size: smallFontSize, font, color: rgb(0.7,0.7,0.7), opacity: 0.15 });
-        page.drawText(watermarkText, { x: topX, y: topY, size: smallFontSize, font, color: rgb(0.5,0.5,0.5), opacity: 0.4 });
+        page.drawText(fullWatermarkText, { x: topX, y: topY, size: smallFontSize, font, color: rgb(0.9,0.9,0.9), opacity: 0.05 });
+        page.drawText(fullWatermarkText, { x: topX, y: topY, size: smallFontSize, font, color: rgb(0.7,0.7,0.7), opacity: 0.15 });
+        page.drawText(fullWatermarkText, { x: topX, y: topY, size: smallFontSize, font, color: rgb(0.5,0.5,0.5), opacity: 0.4 });
 
         // Bottom watermark - multiple layers
-        page.drawText(watermarkText, { x: bottomX, y: bottomY, size: smallFontSize, font, color: rgb(0.9,0.9,0.9), opacity: 0.05 });
-        page.drawText(watermarkText, { x: bottomX, y: bottomY, size: smallFontSize, font, color: rgb(0.7,0.7,0.7), opacity: 0.15 });
-        page.drawText(watermarkText, { x: bottomX, y: bottomY, size: smallFontSize, font, color: rgb(0.5,0.5,0.5), opacity: 0.4 });
+        page.drawText(fullWatermarkText, { x: bottomX, y: bottomY, size: smallFontSize, font, color: rgb(0.9,0.9,0.9), opacity: 0.05 });
+        page.drawText(fullWatermarkText, { x: bottomX, y: bottomY, size: smallFontSize, font, color: rgb(0.7,0.7,0.7), opacity: 0.15 });
+        page.drawText(fullWatermarkText, { x: bottomX, y: bottomY, size: smallFontSize, font, color: rgb(0.5,0.5,0.5), opacity: 0.4 });
 
         // Center watermark - diagonal with multiple layers
-        page.drawText(watermarkText, { x: centerX, y: centerY, size: centerFontSize, font, color: rgb(0.95,0.95,0.95), opacity: 0.03, rotate: degrees(45) });
-        page.drawText(watermarkText, { x: centerX, y: centerY, size: centerFontSize, font, color: rgb(0.8,0.8,0.8), opacity: 0.08, rotate: degrees(45) });
-        page.drawText(watermarkText, { x: centerX, y: centerY, size: centerFontSize, font, color: rgb(0.6,0.6,0.6), opacity: 0.18, rotate: degrees(45) });
+        page.drawText(fullWatermarkText, { x: centerX, y: centerY, size: centerFontSize, font, color: rgb(0.95,0.95,0.95), opacity: 0.03, rotate: degrees(45) });
+        page.drawText(fullWatermarkText, { x: centerX, y: centerY, size: centerFontSize, font, color: rgb(0.8,0.8,0.8), opacity: 0.08, rotate: degrees(45) });
+        page.drawText(fullWatermarkText, { x: centerX, y: centerY, size: centerFontSize, font, color: rgb(0.6,0.6,0.6), opacity: 0.18, rotate: degrees(45) });
 
-        // Hidden forensic watermarks
-        page.drawText(watermarkText, { x: centerX + 5, y: centerY + 5, size: centerFontSize - 2, font, color: rgb(0.98,0.98,0.98), opacity: 0.02, rotate: degrees(30) });
-        page.drawText(watermarkText, { x: centerX - 5, y: centerY - 5, size: centerFontSize - 2, font, color: rgb(0.98,0.98,0.98), opacity: 0.02, rotate: degrees(60) });
+        // Hidden forensic watermarks with email prefix only
+        page.drawText(fullWatermarkText, { x: centerX + 5, y: centerY + 5, size: centerFontSize - 2, font, color: rgb(0.98,0.98,0.98), opacity: 0.02, rotate: degrees(30) });
+        page.drawText(fullWatermarkText, { x: centerX - 5, y: centerY - 5, size: centerFontSize - 2, font, color: rgb(0.98,0.98,0.98), opacity: 0.02, rotate: degrees(60) });
+
+        // Scattered hidden watermarks with email prefix only - spread across the page
+        const positions = [
+          { x: width * 0.15, y: height * 0.25, angle: 15 },
+          { x: width * 0.85, y: height * 0.75, angle: -15 },
+          { x: width * 0.25, y: height * 0.65, angle: 25 },
+          { x: width * 0.75, y: height * 0.35, angle: -25 },
+          { x: width * 0.35, y: height * 0.85, angle: 35 },
+          { x: width * 0.65, y: height * 0.15, angle: -35 },
+          { x: width * 0.45, y: height * 0.55, angle: 20 },
+          { x: width * 0.55, y: height * 0.45, angle: -20 },
+          { x: width * 0.20, y: height * 0.90, angle: 10 },
+          { x: width * 0.80, y: height * 0.10, angle: -10 },
+          { x: width * 0.10, y: height * 0.50, angle: 40 },
+          { x: width * 0.90, y: height * 0.50, angle: -40 },
+          { x: width * 0.30, y: height * 0.30, angle: 50 },
+          { x: width * 0.70, y: height * 0.70, angle: -50 },
+          { x: width * 0.40, y: height * 0.20, angle: 30 },
+          { x: width * 0.60, y: height * 0.80, angle: -30 },
+        ];
+
+        for (const pos of positions) {
+          // Ultra-subtle watermarks that are almost invisible but AI-readable
+          page.drawText(emailPrefix, { x: pos.x, y: pos.y, size: hiddenFontSize, font, color: rgb(0.99,0.99,0.99), opacity: 0.01, rotate: degrees(pos.angle) });
+          page.drawText(emailPrefix, { x: pos.x + 2, y: pos.y + 2, size: hiddenFontSize, font, color: rgb(0.98,0.98,0.98), opacity: 0.015, rotate: degrees(pos.angle + 5) });
+          page.drawText(emailPrefix, { x: pos.x - 2, y: pos.y - 2, size: hiddenFontSize, font, color: rgb(0.97,0.97,0.97), opacity: 0.02, rotate: degrees(pos.angle - 5) });
+        }
       }
 
       // Determine safe output name
