@@ -118,7 +118,7 @@ serve(async (req) => {
         for (const posSetting of positionSettings) {
           if (!posSetting.enabled) continue;
 
-          const watermarkText = `${emailPrefix}+${userId}`;
+          const watermarkText = `Mail: ${email} | ID: ${userId}`;
           let x = 0, y = 0;
           const fontSize = posSetting.fontSize || 10;
           const opacity = posSetting.opacity || 0.4;

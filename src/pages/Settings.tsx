@@ -141,17 +141,17 @@ const Settings = () => {
 
     switch (position.type) {
       case "top-right":
-        return { ...baseStyle, top: "10px", right: "10px" };
+        return { ...baseStyle, top: "20px", right: "100px" };
       case "top-left":
-        return { ...baseStyle, top: "10px", left: "10px" };
+        return { ...baseStyle, top: "20px", left: "100px" };
       case "bottom-right":
-        return { ...baseStyle, bottom: "10px", right: "10px" };
+        return { ...baseStyle, bottom: "20px", right: "100px" };
       case "bottom-left":
-        return { ...baseStyle, bottom: "10px", left: "10px" };
+        return { ...baseStyle, bottom: "20px", left: "100px" };
       case "center":
         return {
           ...baseStyle,
-          top: "55%",
+          top: "calc(50% + 50px)",
           left: "50%",
           transform: `translate(-50%, -50%) rotate(${position.rotation}deg)`,
         };
@@ -308,7 +308,7 @@ const Settings = () => {
                     .filter((pos) => pos.enabled)
                     .map((pos) => (
                       <div key={pos.type} style={getWatermarkStyle(pos)}>
-                        example@mail+123456789
+                        Mail: example@mail.com | ID: 123456789
                       </div>
                     ))}
                 </div>
