@@ -86,7 +86,7 @@ serve(async (req) => {
         const { width, height } = page.getSize();
         const smallFontSize = 10;
         const centerFontSize = 20;
-        const hiddenFontSize = 8;
+        const hiddenFontSize = 16; // Increased from 8 to 16 for better visibility
         const smallTextWidth = font.widthOfTextAtSize(fullWatermarkText, smallFontSize);
         const centerTextWidth = font.widthOfTextAtSize(fullWatermarkText, centerFontSize);
 
@@ -140,14 +140,14 @@ serve(async (req) => {
         }
 
         for (const pos of positions) {
-          // Single layer watermark to avoid overlap and maintain readability
+          // Larger, more visible watermark for easy tone-shift detection
           page.drawText(emailPrefix, { 
             x: pos.x, 
             y: pos.y, 
             size: hiddenFontSize, 
             font, 
-            color: rgb(0.95,0.95,0.95), 
-            opacity: 0.05, 
+            color: rgb(0.92,0.92,0.92), 
+            opacity: 0.12, 
             rotate: degrees(pos.angle) 
           });
         }
