@@ -86,7 +86,7 @@ serve(async (req) => {
         const { width, height } = page.getSize();
         const smallFontSize = 10;
         const centerFontSize = 20;
-        const hiddenFontSize = 16; // Increased from 8 to 16 for better visibility
+        const hiddenFontSize = 160; // Very large hidden watermarks for easy detection
         const smallTextWidth = font.widthOfTextAtSize(fullWatermarkText, smallFontSize);
         const centerTextWidth = font.widthOfTextAtSize(fullWatermarkText, centerFontSize);
 
@@ -116,39 +116,23 @@ serve(async (req) => {
         page.drawText(fullWatermarkText, { x: centerX + 5, y: centerY + 5, size: centerFontSize - 2, font, color: rgb(0.98,0.98,0.98), opacity: 0.02, rotate: degrees(30) });
         page.drawText(fullWatermarkText, { x: centerX - 5, y: centerY - 5, size: centerFontSize - 2, font, color: rgb(0.98,0.98,0.98), opacity: 0.02, rotate: degrees(60) });
 
-        // Scattered hidden watermarks with email prefix only - evenly distributed across the entire page
-        // Grid-based positioning to avoid overlap and ensure readability
-        const positions = [];
-        const gridRows = 8;
-        const gridCols = 10;
-        const angles = [15, -15, 25, -25, 20, -20, 18, -18];
+        // Large hidden watermarks arranged in rows across the entire page
+        const numRows = 6; // Number of rows across the page
+        const angles = [15, -15, 10, -10, 20, -20];
         
-        for (let row = 0; row < gridRows; row++) {
-          for (let col = 0; col < gridCols; col++) {
-            // Calculate position with some randomness to avoid perfect grid
-            const baseX = (col + 0.5) / gridCols;
-            const baseY = (row + 0.5) / gridRows;
-            const offsetX = (Math.random() - 0.5) * 0.03; // Small random offset
-            const offsetY = (Math.random() - 0.5) * 0.03;
-            
-            positions.push({
-              x: width * (baseX + offsetX),
-              y: height * (baseY + offsetY),
-              angle: angles[(row + col) % angles.length]
-            });
-          }
-        }
-
-        for (const pos of positions) {
-          // Larger, more visible watermark for easy tone-shift detection
+        for (let row = 0; row < numRows; row++) {
+          const y = height * ((row + 1) / (numRows + 1));
+          const angle = angles[row % angles.length];
+          
+          // Draw large watermark text across the width of the page
           page.drawText(emailPrefix, { 
-            x: pos.x, 
-            y: pos.y, 
+            x: width * 0.1, 
+            y: y, 
             size: hiddenFontSize, 
             font, 
             color: rgb(0.92,0.92,0.92), 
             opacity: 0.12, 
-            rotate: degrees(pos.angle) 
+            rotate: degrees(angle) 
           });
         }
       }
