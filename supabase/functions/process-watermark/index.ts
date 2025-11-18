@@ -64,16 +64,18 @@ serve(async (req) => {
     }
 
     const watermarkConfig = settings || {
-      positions: [
-        { type: "top-right", enabled: true },
-        { type: "top-left", enabled: false },
-        { type: "bottom-right", enabled: true },
-        { type: "bottom-left", enabled: true },
-        { type: "center", enabled: true }
+      position_settings: [
+        { type: 'top-right', enabled: true, fontSize: 10, opacity: 0.4, rotation: 0 },
+        { type: 'top-left', enabled: false, fontSize: 10, opacity: 0.4, rotation: 0 },
+        { type: 'bottom-right', enabled: true, fontSize: 10, opacity: 0.4, rotation: 0 },
+        { type: 'bottom-left', enabled: true, fontSize: 10, opacity: 0.4, rotation: 0 },
+        { type: 'center', enabled: true, fontSize: 10, opacity: 0.4, rotation: 45 }
       ],
-      font_size: 10,
-      opacity: 0.4,
-      center_rotation: 45
+      hidden_watermark_enabled: true,
+      hidden_watermark_font_size: 4,
+      hidden_watermark_opacity: 0.02,
+      hidden_watermark_row_spacing: 100,
+      hidden_watermark_col_spacing: 150
     };
 
     // Helper to process a single file path and return processedId
@@ -107,99 +109,85 @@ serve(async (req) => {
       const fullWatermarkText = `${email} | ID: ${userId}`;
       const emailPrefix = email.split('@')[0]; // Extract email prefix only
 
-      // Get settings from config
-      const visibleFontSize = watermarkConfig.font_size;
-      const visibleOpacity = watermarkConfig.opacity;
-      const centerFontSize = visibleFontSize * 2;
-      const hiddenFontSize = 24;
-
       for (const page of pages) {
         const { width, height } = page.getSize();
-        const smallTextWidth = font.widthOfTextAtSize(fullWatermarkText, visibleFontSize);
-        const centerTextWidth = font.widthOfTextAtSize(fullWatermarkText, centerFontSize);
-        const hiddenTextWidth = font.widthOfTextAtSize(emailPrefix, hiddenFontSize);
-
-        // Calculate positions based on enabled settings
-        const positions = watermarkConfig.positions || [];
         
-        positions.forEach((pos: any) => {
-          if (!pos.enabled) return;
+        // Add visible watermarks based on position_settings
+        const positionSettings = watermarkConfig.position_settings || [];
+        
+        for (const posSetting of positionSettings) {
+          if (!posSetting.enabled) continue;
 
+          const watermarkText = `${emailPrefix}+${userId}`;
           let x = 0, y = 0;
-          let size = visibleFontSize;
-          let rotation = 0;
+          const fontSize = posSetting.fontSize || 10;
+          const opacity = posSetting.opacity || 0.4;
+          const rotation = posSetting.rotation || 0;
 
-          switch (pos.type) {
+          switch (posSetting.type) {
             case "top-right":
-              x = width - smallTextWidth - 15;
+              x = width - 100;
               y = height - 20;
               break;
             case "top-left":
-              x = 15;
+              x = 100;
               y = height - 20;
               break;
             case "bottom-right":
-              x = width - smallTextWidth - 15;
-              y = 15;
+              x = width - 100;
+              y = 20;
               break;
             case "bottom-left":
-              x = 15;
-              y = 15;
+              x = 100;
+              y = 20;
               break;
             case "center":
-              x = (width / 2) - (centerTextWidth / 2);
-              y = (height / 2) - 80;
-              size = centerFontSize;
-              rotation = watermarkConfig.center_rotation || 45;
+              x = width / 2;
+              y = height / 2 + 50;
               break;
           }
 
-          // Draw visible watermark with multiple layers for better visibility
-          const baseColor = 0.5;
-          page.drawText(fullWatermarkText, { 
-            x, y, size, font, 
-            color: rgb(0.9, 0.9, 0.9), 
-            opacity: visibleOpacity * 0.1, 
-            rotate: rotation ? degrees(rotation) : undefined 
-          });
-          page.drawText(fullWatermarkText, { 
-            x, y, size, font, 
-            color: rgb(0.7, 0.7, 0.7), 
-            opacity: visibleOpacity * 0.4, 
-            rotate: rotation ? degrees(rotation) : undefined 
-          });
-          page.drawText(fullWatermarkText, { 
-            x, y, size, font, 
-            color: rgb(baseColor, baseColor, baseColor), 
-            opacity: visibleOpacity, 
-            rotate: rotation ? degrees(rotation) : undefined 
-          });
-        });
-
-        // Hidden forensic watermarks (always present, independent of visible settings)
-        const centerX = (width / 2) - (centerTextWidth / 2);
-        const centerY = (height / 2) - 80;
-        page.drawText(fullWatermarkText, { x: centerX + 5, y: centerY + 5, size: centerFontSize - 2, font, color: rgb(0.98,0.98,0.98), opacity: 0.02, rotate: degrees(30) });
-        page.drawText(fullWatermarkText, { x: centerX - 5, y: centerY - 5, size: centerFontSize - 2, font, color: rgb(0.98,0.98,0.98), opacity: 0.02, rotate: degrees(60) });
-
-        // Hidden watermarks in organized rows across the entire page
-        const numRows = 15; // Number of rows across the page
-        const repeatsPerRow = Math.floor(width / (hiddenTextWidth + 10)); // How many times the email fits per row
-        
-        for (let row = 0; row < numRows; row++) {
-          const y = height * ((row + 1) / (numRows + 1));
-          
-          // Draw the email multiple times in each row
-          for (let col = 0; col < repeatsPerRow; col++) {
-            const x = col * (hiddenTextWidth + 10) + 10;
-            page.drawText(emailPrefix, { 
-              x: x, 
-              y: y, 
-              size: hiddenFontSize, 
-              font, 
-              color: rgb(0.92,0.92,0.92), 
-              opacity: 0.12
+          // Draw watermark with three layers for better visibility
+          for (let layer = 0; layer < 3; layer++) {
+            const layerOpacity = opacity * (1 - layer * 0.15);
+            const grayValue = 0.9 - layer * 0.2;
+            
+            page.drawText(watermarkText, {
+              x,
+              y,
+              size: fontSize,
+              font,
+              color: rgb(grayValue, grayValue, grayValue),
+              opacity: layerOpacity,
+              rotate: degrees(rotation),
             });
+          }
+        }
+
+        // Add hidden forensic watermarks if enabled
+        if (watermarkConfig.hidden_watermark_enabled !== false) {
+          const hiddenText = emailPrefix;
+          const hiddenFontSize = watermarkConfig.hidden_watermark_font_size || 4;
+          const hiddenOpacity = watermarkConfig.hidden_watermark_opacity || 0.02;
+          const rowSpacing = watermarkConfig.hidden_watermark_row_spacing || 100;
+          const colSpacing = watermarkConfig.hidden_watermark_col_spacing || 150;
+          
+          for (let row = 0; row < Math.ceil(height / rowSpacing); row++) {
+            for (let col = 0; col < Math.ceil(width / colSpacing); col++) {
+              const hiddenX = col * colSpacing + 50;
+              const hiddenY = row * rowSpacing + 50;
+              
+              if (hiddenX < width && hiddenY < height) {
+                page.drawText(hiddenText, {
+                  x: hiddenX,
+                  y: hiddenY,
+                  size: hiddenFontSize,
+                  font,
+                  color: rgb(0.5, 0.5, 0.5),
+                  opacity: hiddenOpacity,
+                });
+              }
+            }
           }
         }
       }
