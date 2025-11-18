@@ -116,52 +116,40 @@ serve(async (req) => {
         page.drawText(fullWatermarkText, { x: centerX + 5, y: centerY + 5, size: centerFontSize - 2, font, color: rgb(0.98,0.98,0.98), opacity: 0.02, rotate: degrees(30) });
         page.drawText(fullWatermarkText, { x: centerX - 5, y: centerY - 5, size: centerFontSize - 2, font, color: rgb(0.98,0.98,0.98), opacity: 0.02, rotate: degrees(60) });
 
-        // Scattered hidden watermarks with email prefix only - spread across the page
-        // More positions for better coverage
-        const positions = [
-          { x: width * 0.15, y: height * 0.25, angle: 15 },
-          { x: width * 0.85, y: height * 0.75, angle: -15 },
-          { x: width * 0.25, y: height * 0.65, angle: 25 },
-          { x: width * 0.75, y: height * 0.35, angle: -25 },
-          { x: width * 0.35, y: height * 0.85, angle: 35 },
-          { x: width * 0.65, y: height * 0.15, angle: -35 },
-          { x: width * 0.45, y: height * 0.55, angle: 20 },
-          { x: width * 0.55, y: height * 0.45, angle: -20 },
-          { x: width * 0.20, y: height * 0.90, angle: 10 },
-          { x: width * 0.80, y: height * 0.10, angle: -10 },
-          { x: width * 0.10, y: height * 0.50, angle: 40 },
-          { x: width * 0.90, y: height * 0.50, angle: -40 },
-          { x: width * 0.30, y: height * 0.30, angle: 50 },
-          { x: width * 0.70, y: height * 0.70, angle: -50 },
-          { x: width * 0.40, y: height * 0.20, angle: 30 },
-          { x: width * 0.60, y: height * 0.80, angle: -30 },
-          { x: width * 0.12, y: height * 0.40, angle: 18 },
-          { x: width * 0.88, y: height * 0.60, angle: -18 },
-          { x: width * 0.22, y: height * 0.55, angle: 22 },
-          { x: width * 0.78, y: height * 0.45, angle: -22 },
-          { x: width * 0.32, y: height * 0.72, angle: 28 },
-          { x: width * 0.68, y: height * 0.28, angle: -28 },
-          { x: width * 0.42, y: height * 0.38, angle: 32 },
-          { x: width * 0.58, y: height * 0.62, angle: -32 },
-          { x: width * 0.18, y: height * 0.78, angle: 12 },
-          { x: width * 0.82, y: height * 0.22, angle: -12 },
-          { x: width * 0.28, y: height * 0.48, angle: 38 },
-          { x: width * 0.72, y: height * 0.52, angle: -38 },
-          { x: width * 0.38, y: height * 0.68, angle: 42 },
-          { x: width * 0.62, y: height * 0.32, angle: -42 },
-          { x: width * 0.48, y: height * 0.82, angle: 16 },
-          { x: width * 0.52, y: height * 0.18, angle: -16 },
-        ];
+        // Scattered hidden watermarks with email prefix only - evenly distributed across the entire page
+        // Grid-based positioning to avoid overlap and ensure readability
+        const positions = [];
+        const gridRows = 8;
+        const gridCols = 10;
+        const angles = [15, -15, 25, -25, 20, -20, 18, -18];
+        
+        for (let row = 0; row < gridRows; row++) {
+          for (let col = 0; col < gridCols; col++) {
+            // Calculate position with some randomness to avoid perfect grid
+            const baseX = (col + 0.5) / gridCols;
+            const baseY = (row + 0.5) / gridRows;
+            const offsetX = (Math.random() - 0.5) * 0.03; // Small random offset
+            const offsetY = (Math.random() - 0.5) * 0.03;
+            
+            positions.push({
+              x: width * (baseX + offsetX),
+              y: height * (baseY + offsetY),
+              angle: angles[(row + col) % angles.length]
+            });
+          }
+        }
 
         for (const pos of positions) {
-          // Detectable watermarks with subtle tone shifts - higher opacity for AI detection
-          // Use slight color variations to create detectable patterns
-          page.drawText(emailPrefix, { x: pos.x, y: pos.y, size: hiddenFontSize, font, color: rgb(0.96,0.96,0.96), opacity: 0.04, rotate: degrees(pos.angle) });
-          page.drawText(emailPrefix, { x: pos.x + 2, y: pos.y + 2, size: hiddenFontSize, font, color: rgb(0.94,0.94,0.95), opacity: 0.05, rotate: degrees(pos.angle + 5) });
-          page.drawText(emailPrefix, { x: pos.x - 2, y: pos.y - 2, size: hiddenFontSize, font, color: rgb(0.95,0.95,0.94), opacity: 0.06, rotate: degrees(pos.angle - 5) });
-          // Additional layer with different tone for better AI detection
-          page.drawText(emailPrefix, { x: pos.x + 1, y: pos.y + 1, size: hiddenFontSize, font, color: rgb(0.93,0.94,0.94), opacity: 0.05, rotate: degrees(pos.angle + 10) });
-          page.drawText(emailPrefix, { x: pos.x - 1, y: pos.y - 1, size: hiddenFontSize, font, color: rgb(0.94,0.93,0.94), opacity: 0.05, rotate: degrees(pos.angle - 10) });
+          // Single layer watermark to avoid overlap and maintain readability
+          page.drawText(emailPrefix, { 
+            x: pos.x, 
+            y: pos.y, 
+            size: hiddenFontSize, 
+            font, 
+            color: rgb(0.95,0.95,0.95), 
+            opacity: 0.05, 
+            rotate: degrees(pos.angle) 
+          });
         }
       }
 
