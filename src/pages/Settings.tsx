@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { LogoutButton } from "@/components/LogoutButton";
 import { ArrowRight, Settings as SettingsIcon } from "lucide-react";
 import { Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface WatermarkPosition {
   type: "top-right" | "top-left" | "bottom-right" | "bottom-left" | "center";
@@ -14,6 +16,7 @@ interface WatermarkPosition {
 }
 
 const Settings = () => {
+  const { toast } = useToast();
   const [watermarkPositions, setWatermarkPositions] = useState<WatermarkPosition[]>([
     { type: "top-right", enabled: true },
     { type: "top-left", enabled: false },
@@ -25,6 +28,41 @@ const Settings = () => {
   const [fontSize, setFontSize] = useState<number>(10);
   const [opacity, setOpacity] = useState<number>(0.4);
   const [centerRotation, setCenterRotation] = useState<number>(45);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+
+  // Load settings from database
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("watermark_settings")
+        .select("*")
+        .eq("id", "00000000-0000-0000-0000-000000000001")
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setWatermarkPositions(data.positions as unknown as WatermarkPosition[]);
+        setFontSize(data.font_size);
+        setOpacity(Number(data.opacity));
+        setCenterRotation(data.center_rotation);
+      }
+    } catch (error) {
+      console.error("Error loading settings:", error);
+      toast({
+        title: "שגיאה",
+        description: "לא ניתן לטעון את ההגדרות",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const positionLabels: Record<string, string> = {
     "top-right": "למעלה מימין",
@@ -43,13 +81,34 @@ const Settings = () => {
   };
 
   const saveSettings = async () => {
-    // This will save to database in future implementation
-    console.log("Saving watermark settings:", {
-      positions: watermarkPositions,
-      fontSize,
-      opacity,
-      centerRotation,
-    });
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from("watermark_settings")
+        .update({
+          positions: watermarkPositions as any,
+          font_size: fontSize,
+          opacity: opacity,
+          center_rotation: centerRotation,
+        })
+        .eq("id", "00000000-0000-0000-0000-000000000001");
+
+      if (error) throw error;
+
+      toast({
+        title: "הצלחה!",
+        description: "ההגדרות נשמרו בהצלחה",
+      });
+    } catch (error) {
+      console.error("Error saving settings:", error);
+      toast({
+        title: "שגיאה",
+        description: "לא ניתן לשמור את ההגדרות",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Preview watermark style
@@ -191,9 +250,10 @@ const Settings = () => {
                 {/* Save Button */}
                 <Button
                   onClick={saveSettings}
+                  disabled={isSaving || isLoading}
                   className="w-full h-12 text-lg bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
                 >
-                  שמור הגדרות
+                  {isSaving ? "שומר..." : "שמור הגדרות"}
                 </Button>
               </div>
             </Card>
