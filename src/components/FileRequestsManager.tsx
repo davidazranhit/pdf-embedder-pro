@@ -47,6 +47,11 @@ interface Template {
   file_path: string;
 }
 
+interface Category {
+  name: string;
+  count: number;
+}
+
 
 export const FileRequestsManager = () => {
   const [requests, setRequests] = useState<FileRequest[]>([]);
@@ -57,7 +62,8 @@ export const FileRequestsManager = () => {
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<FileRequest | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [isSending, setIsSending] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -108,6 +114,19 @@ useEffect(() => {
       console.error("Error fetching templates:", error);
     } else {
       setTemplates(data || []);
+      
+      // Extract unique categories with counts
+      const categoryMap = new Map<string, number>();
+      (data || []).forEach((template) => {
+        categoryMap.set(template.category, (categoryMap.get(template.category) || 0) + 1);
+      });
+      
+      const uniqueCategories = Array.from(categoryMap.entries()).map(([name, count]) => ({
+        name,
+        count,
+      }));
+      
+      setCategories(uniqueCategories);
     }
   };
 
@@ -137,45 +156,67 @@ useEffect(() => {
     toast({ title: "עודכן", description: newStatus === "sent" ? "סומן כטופל" : "סומן כלא טופל" });
   };
 
-  const handleSendFromTemplate = async () => {
-    if (!selectedRequest || !selectedTemplateId) return;
+  const handleSendFromCategory = async () => {
+    if (!selectedRequest || !selectedCategory) return;
 
     setIsSending(true);
     try {
-      const template = templates.find((t) => t.id === selectedTemplateId);
-      if (!template) {
-        toast({ title: "שגיאה", description: "תבנית לא נמצאה", variant: "destructive" });
+      // Get all templates in the selected category
+      const categoryTemplates = templates.filter((t) => t.category === selectedCategory);
+      
+      if (categoryTemplates.length === 0) {
+        toast({ title: "שגיאה", description: "לא נמצאו קבצים בקטגוריה זו", variant: "destructive" });
         return;
       }
 
-      // Process watermark for the selected template file
-      const { data: processData, error: processError } = await supabase.functions.invoke(
-        "process-watermark",
-        {
-          body: {
-            filePath: template.file_path,
-            email: selectedRequest.email,
-            userId: selectedRequest.id_number,
-            fileName: template.name,
-          },
-        }
-      );
+      toast({
+        title: "מעבד קבצים",
+        description: `מעבד ${categoryTemplates.length} קבצים...`,
+      });
 
-      if (processError || !processData?.processedFilePath) {
-        console.error("Error processing watermark:", processError);
+      // Process watermark for all templates in the category
+      const processedFilePaths: string[] = [];
+      
+      for (const template of categoryTemplates) {
+        const { data: processData, error: processError } = await supabase.functions.invoke(
+          "process-watermark",
+          {
+            body: {
+              filePath: template.file_path,
+              email: selectedRequest.email,
+              userId: selectedRequest.id_number,
+              fileName: template.name,
+            },
+          }
+        );
+
+        if (processError || !processData?.processedFilePath) {
+          console.error("Error processing watermark for", template.name, processError);
+          toast({
+            title: "שגיאה",
+            description: `שגיאה בעיבוד ${template.name}`,
+            variant: "destructive",
+          });
+          continue;
+        }
+
+        processedFilePaths.push(processData.processedFilePath);
+      }
+
+      if (processedFilePaths.length === 0) {
         toast({
           title: "שגיאה",
-          description: "שגיאה בעיבוד הקובץ",
+          description: "לא הצלחנו לעבד אף קובץ",
           variant: "destructive",
         });
         return;
       }
 
-      // Send email with the processed file
+      // Send email with all processed files
       const { error: sendError } = await supabase.functions.invoke("send-watermarked-files", {
         body: {
           email: selectedRequest.email,
-          fileIds: [processData.processedFilePath],
+          fileIds: processedFilePaths,
         },
       });
 
@@ -200,15 +241,15 @@ useEffect(() => {
 
       toast({
         title: "הצלחה",
-        description: "הקבצים נשלחו בהצלחה",
+        description: `${processedFilePaths.length} קבצים נשלחו בהצלחה`,
       });
 
       setShowTemplateDialog(false);
       setSelectedRequest(null);
-      setSelectedTemplateId("");
+      setSelectedCategory("");
       fetchRequests();
     } catch (error) {
-      console.error("Error in handleSendFromTemplate:", error);
+      console.error("Error in handleSendFromCategory:", error);
       toast({
         title: "שגיאה",
         description: "שגיאה כללית בתהליך השליחה",
@@ -234,22 +275,22 @@ useEffect(() => {
       <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>שלח קבצים מתבנית</DialogTitle>
+            <DialogTitle>שלח קבצים מקטגוריה</DialogTitle>
             <DialogDescription>
-              בחר תבנית לשליחה ל-{selectedRequest?.email}
+              בחר קטגוריה לשליחת כל הקבצים ל-{selectedRequest?.email}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">בחר תבנית</label>
-              <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+              <label className="text-sm font-medium">בחר קטגוריה</label>
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                 <SelectTrigger>
-                  <SelectValue placeholder="בחר תבנית..." />
+                  <SelectValue placeholder="בחר קטגוריה..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {templates.map((template) => (
-                    <SelectItem key={template.id} value={template.id}>
-                      {template.name} ({template.category})
+                  {categories.map((category) => (
+                    <SelectItem key={category.name} value={category.name}>
+                      {category.name} ({category.count} קבצים)
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -274,17 +315,17 @@ useEffect(() => {
                 onClick={() => {
                   setShowTemplateDialog(false);
                   setSelectedRequest(null);
-                  setSelectedTemplateId("");
+                  setSelectedCategory("");
                 }}
                 disabled={isSending}
               >
                 ביטול
               </Button>
               <Button
-                onClick={handleSendFromTemplate}
-                disabled={!selectedTemplateId || isSending}
+                onClick={handleSendFromCategory}
+                disabled={!selectedCategory || isSending}
               >
-                {isSending ? "שולח..." : "שלח קבצים"}
+                {isSending ? "מעבד ושולח..." : "שלח קבצים"}
               </Button>
             </div>
           </div>
@@ -364,7 +405,7 @@ useEffect(() => {
                             }}
                           >
                             <FileStack className="w-4 h-4 ml-2" />
-                            שלח מתבנית
+                            שלח מקטגוריה
                           </Button>
                           <Button size="sm" variant="outline" onClick={() => toggleStatus(request)}>
                             {request.status === "sent" ? "סמן לא טופל" : "סמן טופל"}
