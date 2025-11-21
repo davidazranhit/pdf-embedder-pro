@@ -190,7 +190,7 @@ useEffect(() => {
           }
         );
 
-        if (processError || !processData?.processedFilePath) {
+        if (processError || !processData?.files?.[0]?.processedId) {
           console.error("Error processing watermark for", template.name, processError);
           toast({
             title: "שגיאה",
@@ -200,7 +200,7 @@ useEffect(() => {
           continue;
         }
 
-        processedFilePaths.push(processData.processedFilePath);
+        processedFilePaths.push(processData.files[0].processedId);
       }
 
       if (processedFilePaths.length === 0) {
