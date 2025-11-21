@@ -381,14 +381,15 @@ useEffect(() => {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button size="sm" onClick={() => handleGoToSingleUser(request)}>
+                        <div className="flex flex-col gap-1.5">
+                          <Button size="sm" className="w-full" onClick={() => handleGoToSingleUser(request)}>
                             <Send className="w-4 h-4 ml-2" />
                             שלח קבצים
                           </Button>
                           <Button
                             size="sm"
                             variant="secondary"
+                            className="w-full"
                             onClick={() => {
                               setSelectedRequest(request);
                               setShowTemplateDialog(true);
@@ -397,7 +398,7 @@ useEffect(() => {
                             <FileStack className="w-4 h-4 ml-2" />
                             שלח מקטגוריה
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => toggleStatus(request)}>
+                          <Button size="sm" variant="outline" className="w-full" onClick={() => toggleStatus(request)}>
                             {request.status === "sent" ? "סמן לא טופל" : "סמן טופל"}
                           </Button>
                         </div>
