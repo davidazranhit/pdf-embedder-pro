@@ -34,6 +34,22 @@ serve(async (req) => {
     const { email, fileIds }: SendEmailRequest = await req.json();
     console.log("Sending files to:", email, "Files:", fileIds);
 
+    // Load email template settings from database
+    const { data: settings } = await supabase
+      .from('watermark_settings')
+      .select('email_subject, email_body')
+      .eq('id', '00000000-0000-0000-0000-000000000001')
+      .maybeSingle();
+
+    const emailSubject = settings?.email_subject ?? 'הקבצים המבוקשים שלך';
+    const emailBodyText = settings?.email_body ?? `שלום,
+
+מצורפים הקבצים שלך לקורס.
+
+הקבצים מותאמים אישית עבורך – עם הפרטים שלך – והם נועדו לשימוש אישי בלבד.
+
+חשוב לדעת: כל שיתוף או העתקה של הקבצים נחשבים להפרה חמורה של זכויות יוצרים, ויגררו השלכות בהתאם.`;
+
     // Build signed download links instead of attaching files to avoid memory limits
     const links: { name: string; url: string }[] = [];
 
@@ -94,6 +110,12 @@ serve(async (req) => {
       })
       .join('');
 
+    // Convert email body text to HTML paragraphs
+    const emailBodyHtml = emailBodyText
+      .split('\n')
+      .map((line: string) => line.trim() === '' ? '<br/>' : `<p style="margin-bottom: 16px;">${line}</p>`)
+      .join('');
+
     // Send email using Brevo API
     const emailResponse = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
@@ -105,13 +127,10 @@ serve(async (req) => {
       body: JSON.stringify({
         sender: { name: "David's Pdf System", email: 'davidazranhit@gmail.com' },
         to: [{ email: email }],
-        subject: 'קבצים מהקורס',
+        subject: emailSubject,
         htmlContent: `
           <div dir="rtl" style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px;">
-            <p style="margin-bottom: 16px;">שלום,</p>
-            <p style="margin-bottom: 16px;">מצורפים הקבצים שלך לקורס.</p>
-            <p style="margin-bottom: 16px;">הקבצים מותאמים אישית עבורך – עם הפרטים שלך – והם נועדו לשימוש אישי בלבד.</p>
-            <p style="margin-bottom: 16px;">חשוב לדעת: כל שיתוף או העתקה של הקבצים נחשבים להפרה חמורה של זכויות יוצרים, ויגררו השלכות בהתאם.</p>
+            ${emailBodyHtml}
             <p style="margin-bottom: 12px; margin-top: 20px;"><strong>קבצים להורדה (זמינים ל-3 ימים):</strong></p>
             <div style="margin-right: 20px;">
               ${listItems}

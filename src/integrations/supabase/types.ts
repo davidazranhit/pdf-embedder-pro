@@ -126,6 +126,8 @@ export type Database = {
         Row: {
           center_rotation: number
           created_at: string | null
+          email_body: string | null
+          email_subject: string | null
           font_size: number
           hidden_watermark_col_spacing: number | null
           hidden_watermark_enabled: boolean | null
@@ -141,6 +143,8 @@ export type Database = {
         Insert: {
           center_rotation?: number
           created_at?: string | null
+          email_body?: string | null
+          email_subject?: string | null
           font_size?: number
           hidden_watermark_col_spacing?: number | null
           hidden_watermark_enabled?: boolean | null
@@ -156,6 +160,8 @@ export type Database = {
         Update: {
           center_rotation?: number
           created_at?: string | null
+          email_body?: string | null
+          email_subject?: string | null
           font_size?: number
           hidden_watermark_col_spacing?: number | null
           hidden_watermark_enabled?: boolean | null
