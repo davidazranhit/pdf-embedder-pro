@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Send, Filter, FileStack } from "lucide-react";
+import { FileText, Send, Filter, FileStack, Calendar as CalendarIcon, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
   Dialog,
@@ -29,6 +29,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface FileRequest {
   id: string;
@@ -65,6 +73,9 @@ export const FileRequestsManager = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [isSending, setIsSending] = useState(false);
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [quickFilter, setQuickFilter] = useState<string>("all");
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -73,16 +84,29 @@ export const FileRequestsManager = () => {
     fetchTemplates();
   }, []);
 
-useEffect(() => {
+  useEffect(() => {
     let base = statusFilter === "all" ? requests : requests.filter((r) => r.status === statusFilter);
+    
+    // Search filter
     const q = search.trim().toLowerCase();
     if (q) {
       base = base.filter((r) =>
-        r.email.toLowerCase().includes(q) || r.id_number.toLowerCase().includes(q)
+        r.email.toLowerCase().includes(q) || r.id_number.toLowerCase().includes(q) || r.course_name.toLowerCase().includes(q)
       );
     }
+    
+    // Date range filter
+    if (startDate) {
+      base = base.filter((r) => new Date(r.submission_date) >= startDate);
+    }
+    if (endDate) {
+      const endOfDay = new Date(endDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      base = base.filter((r) => new Date(r.submission_date) <= endOfDay);
+    }
+    
     setFilteredRequests(base);
-  }, [statusFilter, requests, search]);
+  }, [statusFilter, requests, search, startDate, endDate]);
 
   const fetchRequests = async () => {
     setIsLoading(true);
@@ -250,6 +274,41 @@ useEffect(() => {
     }
   };
 
+  const handleQuickFilter = (value: string) => {
+    setQuickFilter(value);
+    const now = new Date();
+    
+    switch (value) {
+      case "today":
+        setStartDate(new Date(now.setHours(0, 0, 0, 0)));
+        setEndDate(new Date());
+        break;
+      case "week":
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        setStartDate(weekAgo);
+        setEndDate(new Date());
+        break;
+      case "month":
+        const monthAgo = new Date();
+        monthAgo.setMonth(monthAgo.getMonth() - 1);
+        setStartDate(monthAgo);
+        setEndDate(new Date());
+        break;
+      case "all":
+      default:
+        setStartDate(undefined);
+        setEndDate(undefined);
+        break;
+    }
+  };
+
+  const clearDateFilters = () => {
+    setStartDate(undefined);
+    setEndDate(undefined);
+    setQuickFilter("all");
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("he-IL", {
       year: "numeric",
@@ -323,14 +382,14 @@ useEffect(() => {
       </Dialog>
 
       <Card className="p-6">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-semibold text-foreground">בקשות לקבצים</h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-semibold text-foreground">בקשות לקבצים</h3>
               <div className="flex items-center gap-2">
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="חיפוש לפי ת.ז או מייל"
+                  placeholder="חיפוש לפי ת.ז, מייל או קורס"
                   className="max-w-[220px]"
                 />
                 <Filter className="w-4 h-4 text-muted-foreground" />
@@ -344,7 +403,93 @@ useEffect(() => {
                   <option value="sent">טופל</option>
                 </select>
               </div>
-          </div>
+            </div>
+
+            {/* Date Filters */}
+            <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/50 rounded-lg">
+              <span className="text-sm font-medium">סינון לפי תאריך:</span>
+              
+              <select
+                value={quickFilter}
+                onChange={(e) => handleQuickFilter(e.target.value)}
+                className="px-3 py-1.5 border rounded-lg bg-background text-sm"
+              >
+                <option value="all">כל התאריכים</option>
+                <option value="today">היום</option>
+                <option value="week">שבוע אחרון</option>
+                <option value="month">חודש אחרון</option>
+              </select>
+
+              <span className="text-sm text-muted-foreground">או בחר טווח:</span>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      "justify-start text-right font-normal",
+                      !startDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="ml-2 h-4 w-4" />
+                    {startDate ? format(startDate, "PPP") : "מתאריך"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={startDate}
+                    onSelect={(date) => {
+                      setStartDate(date);
+                      setQuickFilter("all");
+                    }}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      "justify-start text-right font-normal",
+                      !endDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="ml-2 h-4 w-4" />
+                    {endDate ? format(endDate, "PPP") : "עד תאריך"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={endDate}
+                    onSelect={(date) => {
+                      setEndDate(date);
+                      setQuickFilter("all");
+                    }}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+
+              {(startDate || endDate) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearDateFilters}
+                  className="h-8 px-2"
+                >
+                  <X className="h-4 w-4" />
+                  נקה
+                </Button>
+              )}
+            </div>
 
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">טוען...</div>
