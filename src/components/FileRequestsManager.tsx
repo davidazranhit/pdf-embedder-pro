@@ -174,43 +174,33 @@ useEffect(() => {
         description: `מעבד ${categoryTemplates.length} קבצים...`,
       });
 
-      // Process watermark for all templates in the category
-      const processedFilePaths: string[] = [];
-      
-      for (const template of categoryTemplates) {
-        const { data: processData, error: processError } = await supabase.functions.invoke(
-          "process-watermark",
-          {
-            body: {
-              filePath: template.file_path,
-              email: selectedRequest.email,
-              userId: selectedRequest.id_number,
-              fileName: template.name,
-            },
-          }
-        );
+      // Collect all file paths from the category
+      const allFileIds = categoryTemplates.map((template) => template.file_path);
 
-        if (processError || !processData?.files?.[0]?.processedId) {
-          console.error("Error processing watermark for", template.name, processError);
-          toast({
-            title: "שגיאה",
-            description: `שגיאה בעיבוד ${template.name}`,
-            variant: "destructive",
-          });
-          continue;
+      // Process watermarks for all files at once (same as in Index.tsx)
+      const { data: processData, error: processError } = await supabase.functions.invoke(
+        "process-watermark",
+        {
+          body: {
+            fileIds: allFileIds,
+            email: selectedRequest.email,
+            userId: selectedRequest.id_number,
+          },
         }
+      );
 
-        processedFilePaths.push(processData.files[0].processedId);
-      }
-
-      if (processedFilePaths.length === 0) {
+      if (processError || !processData?.files || processData.files.length === 0) {
+        console.error("Error processing watermarks:", processError);
         toast({
           title: "שגיאה",
-          description: "לא הצלחנו לעבד אף קובץ",
+          description: "לא הצלחנו לעבד את הקבצים",
           variant: "destructive",
         });
         return;
       }
+
+      // Extract processed file paths
+      const processedFilePaths = processData.files.map((f: any) => f.processedId);
 
       // Send email with all processed files
       const { error: sendError } = await supabase.functions.invoke("send-watermarked-files", {
