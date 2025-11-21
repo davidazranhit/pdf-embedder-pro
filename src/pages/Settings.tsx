@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { LogoutButton } from "@/components/LogoutButton";
 import { ArrowRight, Settings as SettingsIcon } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -34,6 +36,8 @@ const Settings = () => {
   const [hiddenRowSpacing, setHiddenRowSpacing] = useState<number>(15);
   const [hiddenColSpacing, setHiddenColSpacing] = useState<number>(10);
   const [showHiddenPreview, setShowHiddenPreview] = useState<boolean>(false);
+  const [emailSubject, setEmailSubject] = useState<string>("הקבצים המבוקשים שלך");
+  const [emailBody, setEmailBody] = useState<string>("שלום,\n\nמצורפים הקבצים שלך לקורס.\n\nהקבצים מותאמים אישית עבורך – עם הפרטים שלך – והם נועדו לשימוש אישי בלבד.\n\nחשוב לדעת: כל שיתוף או העתקה של הקבצים נחשבים להפרה חמורה של זכויות יוצרים, ויגררו השלכות בהתאם.");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
@@ -62,6 +66,8 @@ const Settings = () => {
         setHiddenOpacity(Number(data.hidden_watermark_opacity ?? 0.12));
         setHiddenRowSpacing(data.hidden_watermark_row_spacing ?? 15);
         setHiddenColSpacing(data.hidden_watermark_col_spacing ?? 10);
+        setEmailSubject(data.email_subject ?? "הקבצים המבוקשים שלך");
+        setEmailBody(data.email_body ?? "שלום,\n\nמצורפים הקבצים שלך לקורס.\n\nהקבצים מותאמים אישית עבורך – עם הפרטים שלך – והם נועדו לשימוש אישי בלבד.\n\nחשוב לדעת: כל שיתוף או העתקה של הקבצים נחשבים להפרה חמורה של זכויות יוצרים, ויגררו השלכות בהתאם.");
       }
     } catch (error) {
       console.error("Error loading settings:", error);
@@ -106,6 +112,8 @@ const Settings = () => {
           hidden_watermark_opacity: hiddenOpacity,
           hidden_watermark_row_spacing: hiddenRowSpacing,
           hidden_watermark_col_spacing: hiddenColSpacing,
+          email_subject: emailSubject,
+          email_body: emailBody,
         })
         .eq("id", "00000000-0000-0000-0000-000000000001");
 
@@ -344,6 +352,42 @@ const Settings = () => {
                       </div>
                     </>
                   )}
+                </div>
+
+                {/* Email Template Section */}
+                <div className="pt-6 border-t border-border">
+                  <h3 className="text-xl font-semibold mb-4 text-foreground">
+                    תבנית מייל
+                  </h3>
+                  
+                  {/* Email Subject */}
+                  <div className="space-y-3 mb-6">
+                    <Label className="text-base font-medium">
+                      כותרת המייל
+                    </Label>
+                    <Input
+                      value={emailSubject}
+                      onChange={(e) => setEmailSubject(e.target.value)}
+                      className="w-full"
+                      placeholder="הכנס כותרת למייל"
+                    />
+                  </div>
+
+                  {/* Email Body */}
+                  <div className="space-y-3 mb-6">
+                    <Label className="text-base font-medium">
+                      תוכן המייל (לפני רשימת הקבצים)
+                    </Label>
+                    <Textarea
+                      value={emailBody}
+                      onChange={(e) => setEmailBody(e.target.value)}
+                      className="w-full min-h-[200px]"
+                      placeholder="הכנס את תוכן המייל"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      רשימת הקבצים והמשפט "בהצלחה בקורס!" יתווספו אוטומטית אחרי הטקסט שתגדיר
+                    </p>
+                  </div>
                 </div>
 
                 {/* Save Button */}
