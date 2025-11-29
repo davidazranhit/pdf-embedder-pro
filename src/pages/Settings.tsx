@@ -38,6 +38,9 @@ const Settings = () => {
   const [showHiddenPreview, setShowHiddenPreview] = useState<boolean>(false);
   const [emailSubject, setEmailSubject] = useState<string>("הקבצים המבוקשים שלך");
   const [emailBody, setEmailBody] = useState<string>("שלום,\n\nמצורפים הקבצים שלך לקורס.\n\nהקבצים מותאמים אישית עבורך – עם הפרטים שלך – והם נועדו לשימוש אישי בלבד.\n\nחשוב לדעת: כל שיתוף או העתקה של הקבצים נחשבים להפרה חמורה של זכויות יוצרים, ויגררו השלכות בהתאם.");
+  const [formTitle, setFormTitle] = useState<string>("בקשת קבצים");
+  const [formInstructions, setFormInstructions] = useState<string>("הוראות למילוי:\n\nעליך להזין מייל ותעודת זהות וקורס מבוקש.\n\nלאחר שליחת הבקשה הפרטים יועברו לבדיקה ולאחר אישור (אין טעם לעדכן ששלחתם את הבקשה, היא תטופל בהקדם) יישלחו הקבצים המבוקשים ישירות למייל עם הפרטים האישיים מוטמעים על הקבצים למניעת שיתוף והפצה.");
+  const [formWarning, setFormWarning] = useState<string>("כל ניסיון שיתוף או הפצת הקבצים מהווה הפרה חמורה של זכויות יוצרים ויטופל בהתאם");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
@@ -68,6 +71,9 @@ const Settings = () => {
         setHiddenColSpacing(data.hidden_watermark_col_spacing ?? 10);
         setEmailSubject(data.email_subject ?? "הקבצים המבוקשים שלך");
         setEmailBody(data.email_body ?? "שלום,\n\nמצורפים הקבצים שלך לקורס.\n\nהקבצים מותאמים אישית עבורך – עם הפרטים שלך – והם נועדו לשימוש אישי בלבד.\n\nחשוב לדעת: כל שיתוף או העתקה של הקבצים נחשבים להפרה חמורה של זכויות יוצרים, ויגררו השלכות בהתאם.");
+        setFormTitle(data.form_title ?? "בקשת קבצים");
+        setFormInstructions(data.form_instructions ?? "הוראות למילוי:\n\nעליך להזין מייל ותעודת זהות וקורס מבוקש.\n\nלאחר שליחת הבקשה הפרטים יועברו לבדיקה ולאחר אישור (אין טעם לעדכן ששלחתם את הבקשה, היא תטופל בהקדם) יישלחו הקבצים המבוקשים ישירות למייל עם הפרטים האישיים מוטמעים על הקבצים למניעת שיתוף והפצה.");
+        setFormWarning(data.form_warning ?? "כל ניסיון שיתוף או הפצת הקבצים מהווה הפרה חמורה של זכויות יוצרים ויטופל בהתאם");
       }
     } catch (error) {
       console.error("Error loading settings:", error);
@@ -114,6 +120,9 @@ const Settings = () => {
           hidden_watermark_col_spacing: hiddenColSpacing,
           email_subject: emailSubject,
           email_body: emailBody,
+          form_title: formTitle,
+          form_instructions: formInstructions,
+          form_warning: formWarning,
         })
         .eq("id", "00000000-0000-0000-0000-000000000001");
 
@@ -387,6 +396,52 @@ const Settings = () => {
                     <p className="text-sm text-muted-foreground">
                       רשימת הקבצים והמשפט "בהצלחה בקורס!" יתווספו אוטומטית אחרי הטקסט שתגדיר
                     </p>
+                  </div>
+                </div>
+
+                {/* File Request Form Section */}
+                <div className="pt-6 border-t border-border">
+                  <h3 className="text-xl font-semibold mb-4 text-foreground">
+                    טופס בקשת קבצים
+                  </h3>
+                  
+                  {/* Form Title */}
+                  <div className="space-y-3 mb-6">
+                    <Label className="text-base font-medium">
+                      כותרת הטופס
+                    </Label>
+                    <Input
+                      value={formTitle}
+                      onChange={(e) => setFormTitle(e.target.value)}
+                      className="w-full"
+                      placeholder="הכנס כותרת לטופס"
+                    />
+                  </div>
+
+                  {/* Form Instructions */}
+                  <div className="space-y-3 mb-6">
+                    <Label className="text-base font-medium">
+                      הוראות למילוי
+                    </Label>
+                    <Textarea
+                      value={formInstructions}
+                      onChange={(e) => setFormInstructions(e.target.value)}
+                      className="w-full min-h-[150px]"
+                      placeholder="הכנס את ההוראות למילוי הטופס"
+                    />
+                  </div>
+
+                  {/* Form Warning */}
+                  <div className="space-y-3 mb-6">
+                    <Label className="text-base font-medium">
+                      אזהרת זכויות יוצרים
+                    </Label>
+                    <Textarea
+                      value={formWarning}
+                      onChange={(e) => setFormWarning(e.target.value)}
+                      className="w-full min-h-[100px]"
+                      placeholder="הכנס את האזהרה על זכויות יוצרים"
+                    />
                   </div>
                 </div>
 

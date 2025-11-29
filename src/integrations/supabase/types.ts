@@ -129,6 +129,9 @@ export type Database = {
           email_body: string | null
           email_subject: string | null
           font_size: number
+          form_instructions: string | null
+          form_title: string | null
+          form_warning: string | null
           hidden_watermark_col_spacing: number | null
           hidden_watermark_enabled: boolean | null
           hidden_watermark_font_size: number | null
@@ -146,6 +149,9 @@ export type Database = {
           email_body?: string | null
           email_subject?: string | null
           font_size?: number
+          form_instructions?: string | null
+          form_title?: string | null
+          form_warning?: string | null
           hidden_watermark_col_spacing?: number | null
           hidden_watermark_enabled?: boolean | null
           hidden_watermark_font_size?: number | null
@@ -163,6 +169,9 @@ export type Database = {
           email_body?: string | null
           email_subject?: string | null
           font_size?: number
+          form_instructions?: string | null
+          form_title?: string | null
+          form_warning?: string | null
           hidden_watermark_col_spacing?: number | null
           hidden_watermark_enabled?: boolean | null
           hidden_watermark_font_size?: number | null

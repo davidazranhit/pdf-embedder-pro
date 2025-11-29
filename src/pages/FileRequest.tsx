@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,34 @@ const FileRequest = () => {
   const [idNumber, setIdNumber] = useState("");
   const [courseName, setCourseName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formTitle, setFormTitle] = useState("בקשת קבצים");
+  const [formInstructions, setFormInstructions] = useState("הוראות למילוי:\n\nעליך להזין מייל ותעודת זהות וקורס מבוקש.\n\nלאחר שליחת הבקשה הפרטים יועברו לבדיקה ולאחר אישור (אין טעם לעדכן ששלחתם את הבקשה, היא תטופל בהקדם) יישלחו הקבצים המבוקשים ישירות למייל עם הפרטים האישיים מוטמעים על הקבצים למניעת שיתוף והפצה.");
+  const [formWarning, setFormWarning] = useState("כל ניסיון שיתוף או הפצת הקבצים מהווה הפרה חמורה של זכויות יוצרים ויטופל בהתאם");
   const { toast } = useToast();
+
+  useEffect(() => {
+    loadFormTexts();
+  }, []);
+
+  const loadFormTexts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("watermark_settings")
+        .select("form_title, form_instructions, form_warning")
+        .eq("id", "00000000-0000-0000-0000-000000000001")
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setFormTitle(data.form_title ?? "בקשת קבצים");
+        setFormInstructions(data.form_instructions ?? "הוראות למילוי:\n\nעליך להזין מייל ותעודת זהות וקורס מבוקש.\n\nלאחר שליחת הבקשה הפרטים יועברו לבדיקה ולאחר אישור (אין טעם לעדכן ששלחתם את הבקשה, היא תטופל בהקדם) יישלחו הקבצים המבוקשים ישירות למייל עם הפרטים האישיים מוטמעים על הקבצים למניעת שיתוף והפצה.");
+        setFormWarning(data.form_warning ?? "כל ניסיון שיתוף או הפצת הקבצים מהווה הפרה חמורה של זכויות יוצרים ויטופל בהתאם");
+      }
+    } catch (error) {
+      console.error("Error loading form texts:", error);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,15 +103,11 @@ const FileRequest = () => {
           <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
             <FileText className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="text-3xl font-bold text-foreground">בקשת קבצים</h1>
+          <h1 className="text-3xl font-bold text-foreground">{formTitle}</h1>
           <div className="text-muted-foreground space-y-2 text-sm max-w-md mx-auto">
-            <p className="font-semibold text-base">הוראות למילוי:</p>
-            <p>עליך להזין מייל ותעודת זהות וקורס מבוקש.</p>
-            <p>
-              לאחר שליחת הבקשה הפרטים יועברו לבדיקה ולאחר אישור (אין טעם לעדכן ששלחתם את הבקשה, היא תטופל בהקדם) יישלחו הקבצים המבוקשים ישירות למייל עם הפרטים האישיים מוטמעים על הקבצים למניעת שיתוף והפצה.
-            </p>
+            <p className="whitespace-pre-wrap">{formInstructions}</p>
             <p className="text-destructive font-semibold">
-              כל ניסיון שיתוף או הפצת הקבצים מהווה הפרה חמורה של זכויות יוצרים ויטופל בהתאם
+              {formWarning}
             </p>
           </div>
         </div>
