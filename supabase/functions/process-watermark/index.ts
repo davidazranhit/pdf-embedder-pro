@@ -94,10 +94,14 @@ serve(async (req) => {
         throw new Error(`Failed to download file: ${downloadError.message}`);
       }
 
-      // Load PDF
+      // Load original PDF
       const pdfBytes = await fileData.arrayBuffer();
-      const pdfDoc = await PDFDocument.load(pdfBytes);
+      const originalPdf = await PDFDocument.load(pdfBytes);
+      
+      // Create a new PDF document
+      const pdfDoc = await PDFDocument.create();
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
       // Add metadata watermark (hidden but traceable)
       pdfDoc.setTitle(`Protected Document - ${userId}`);
@@ -107,8 +111,117 @@ serve(async (req) => {
       pdfDoc.setProducer(`David's PDF System - User: ${userId}`);
       pdfDoc.setCreator(`Watermarked for ${email}`);
 
-      // Add watermark to each page
-      const pages = pdfDoc.getPages();
+      // Get original file name for the cover page
+      const originalFileName = displayName || (path.split('/').pop() || 'document.pdf');
+      const fileNameWithoutExt = originalFileName.replace(/\.pdf$/i, '');
+
+      // Create cover page (A4 size: 595 x 842 points)
+      const coverPage = pdfDoc.addPage([595, 842]);
+      const { width: coverWidth, height: coverHeight } = coverPage.getSize();
+
+      // Draw elegant cover page
+      // Background subtle gradient effect (using rectangles with different opacities)
+      coverPage.drawRectangle({
+        x: 0,
+        y: coverHeight * 0.6,
+        width: coverWidth,
+        height: coverHeight * 0.4,
+        color: rgb(0.97, 0.97, 0.98),
+      });
+
+      // Title section
+      const titleText = fileNameWithoutExt;
+      const titleFontSize = 28;
+      const titleWidth = boldFont.widthOfTextAtSize(titleText, titleFontSize);
+      coverPage.drawText(titleText, {
+        x: (coverWidth - titleWidth) / 2,
+        y: coverHeight * 0.7,
+        size: titleFontSize,
+        font: boldFont,
+        color: rgb(0.2, 0.2, 0.3),
+      });
+
+      // Decorative line under title
+      coverPage.drawLine({
+        start: { x: coverWidth * 0.3, y: coverHeight * 0.68 },
+        end: { x: coverWidth * 0.7, y: coverHeight * 0.68 },
+        thickness: 2,
+        color: rgb(0.3, 0.4, 0.6),
+      });
+
+      // User details section
+      const detailsFontSize = 16;
+      const detailsY = coverHeight * 0.5;
+      const detailsLineHeight = 35;
+
+      // Email
+      const emailLabel = "אימייל:";
+      const emailLabelWidth = font.widthOfTextAtSize(emailLabel, detailsFontSize);
+      const emailValueWidth = font.widthOfTextAtSize(email, detailsFontSize);
+      coverPage.drawText(emailLabel, {
+        x: (coverWidth + emailValueWidth) / 2 + 10,
+        y: detailsY,
+        size: detailsFontSize,
+        font: boldFont,
+        color: rgb(0.3, 0.3, 0.4),
+      });
+      coverPage.drawText(email, {
+        x: (coverWidth - emailValueWidth) / 2 - 10,
+        y: detailsY,
+        size: detailsFontSize,
+        font: font,
+        color: rgb(0.4, 0.4, 0.5),
+      });
+
+      // ID
+      const idLabel = "תעודת זהות:";
+      const idLabelWidth = font.widthOfTextAtSize(idLabel, detailsFontSize);
+      const idValueWidth = font.widthOfTextAtSize(userId, detailsFontSize);
+      coverPage.drawText(idLabel, {
+        x: (coverWidth + idValueWidth) / 2 + 10,
+        y: detailsY - detailsLineHeight,
+        size: detailsFontSize,
+        font: boldFont,
+        color: rgb(0.3, 0.3, 0.4),
+      });
+      coverPage.drawText(userId, {
+        x: (coverWidth - idValueWidth) / 2 - 10,
+        y: detailsY - detailsLineHeight,
+        size: detailsFontSize,
+        font: font,
+        color: rgb(0.4, 0.4, 0.5),
+      });
+
+      // Success message at bottom
+      const successText = "בהצלחה!";
+      const successFontSize = 24;
+      const successWidth = boldFont.widthOfTextAtSize(successText, successFontSize);
+      coverPage.drawText(successText, {
+        x: (coverWidth - successWidth) / 2,
+        y: coverHeight * 0.15,
+        size: successFontSize,
+        font: boldFont,
+        color: rgb(0.3, 0.5, 0.7),
+      });
+
+      // Decorative elements (small dots or circles)
+      const dotSize = 4;
+      coverPage.drawCircle({
+        x: coverWidth * 0.25,
+        y: coverHeight * 0.15,
+        size: dotSize,
+        color: rgb(0.3, 0.5, 0.7),
+      });
+      coverPage.drawCircle({
+        x: coverWidth * 0.75,
+        y: coverHeight * 0.15,
+        size: dotSize,
+        color: rgb(0.3, 0.5, 0.7),
+      });
+
+      // Copy all pages from original PDF and add watermarks
+      const copiedPages = await pdfDoc.copyPages(originalPdf, originalPdf.getPageIndices());
+      const pages = copiedPages;
       const fullWatermarkText = `${email} | ID: ${userId}`;
       const emailPrefix = email.split('@')[0]; // Extract email prefix only
 
@@ -122,7 +235,9 @@ serve(async (req) => {
       const hiddenColSpacing = watermarkConfig.hidden_watermark_col_spacing || 10;
       const hiddenEnabled = watermarkConfig.hidden_watermark_enabled !== false;
 
+      // Add copied pages to the document and apply watermarks
       for (const page of pages) {
+        pdfDoc.addPage(page);
         const { width, height } = page.getSize();
         const smallTextWidth = font.widthOfTextAtSize(fullWatermarkText, visibleFontSize);
         const centerTextWidth = font.widthOfTextAtSize(fullWatermarkText, centerFontSize);
