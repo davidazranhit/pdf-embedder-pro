@@ -129,10 +129,18 @@ serve(async (req) => {
         color: rgb(0.97, 0.97, 0.98),
       });
 
-      // Title section
+      // Title section - handle Hebrew/Unicode text
       const titleText = fileNameWithoutExt;
       const titleFontSize = 28;
-      const titleWidth = boldFont.widthOfTextAtSize(titleText, titleFontSize);
+      
+      // Try to calculate width, but use fallback if font doesn't support the characters
+      let titleWidth = coverWidth * 0.6; // Default fallback width
+      try {
+        titleWidth = boldFont.widthOfTextAtSize(titleText, titleFontSize);
+      } catch (e) {
+        console.log("Could not calculate title width, using default positioning");
+      }
+      
       coverPage.drawText(titleText, {
         x: (coverWidth - titleWidth) / 2,
         y: coverHeight * 0.7,
@@ -154,48 +162,49 @@ serve(async (req) => {
       const detailsY = coverHeight * 0.5;
       const detailsLineHeight = 35;
 
-      // Email
-      const emailLabel = "אימייל:";
-      const emailLabelWidth = font.widthOfTextAtSize(emailLabel, detailsFontSize);
-      const emailValueWidth = font.widthOfTextAtSize(email, detailsFontSize);
-      coverPage.drawText(emailLabel, {
-        x: (coverWidth + emailValueWidth) / 2 + 10,
+      // Email - simple centered layout
+      coverPage.drawText("Email:", {
+        x: coverWidth * 0.3,
         y: detailsY,
         size: detailsFontSize,
         font: boldFont,
         color: rgb(0.3, 0.3, 0.4),
       });
       coverPage.drawText(email, {
-        x: (coverWidth - emailValueWidth) / 2 - 10,
+        x: coverWidth * 0.45,
         y: detailsY,
         size: detailsFontSize,
         font: font,
         color: rgb(0.4, 0.4, 0.5),
       });
 
-      // ID
-      const idLabel = "תעודת זהות:";
-      const idLabelWidth = font.widthOfTextAtSize(idLabel, detailsFontSize);
-      const idValueWidth = font.widthOfTextAtSize(userId, detailsFontSize);
-      coverPage.drawText(idLabel, {
-        x: (coverWidth + idValueWidth) / 2 + 10,
+      // ID - simple centered layout
+      coverPage.drawText("ID:", {
+        x: coverWidth * 0.3,
         y: detailsY - detailsLineHeight,
         size: detailsFontSize,
         font: boldFont,
         color: rgb(0.3, 0.3, 0.4),
       });
       coverPage.drawText(userId, {
-        x: (coverWidth - idValueWidth) / 2 - 10,
+        x: coverWidth * 0.45,
         y: detailsY - detailsLineHeight,
         size: detailsFontSize,
         font: font,
         color: rgb(0.4, 0.4, 0.5),
       });
 
-      // Success message at bottom
-      const successText = "בהצלחה!";
+      // Success message at bottom - simple centered
+      const successText = "Good Luck!";
       const successFontSize = 24;
-      const successWidth = boldFont.widthOfTextAtSize(successText, successFontSize);
+      
+      let successWidth = coverWidth * 0.3; // Default fallback
+      try {
+        successWidth = boldFont.widthOfTextAtSize(successText, successFontSize);
+      } catch (e) {
+        console.log("Could not calculate success text width, using default positioning");
+      }
+      
       coverPage.drawText(successText, {
         x: (coverWidth - successWidth) / 2,
         y: coverHeight * 0.15,
