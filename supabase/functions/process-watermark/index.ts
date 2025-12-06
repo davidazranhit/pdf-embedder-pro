@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { PDFDocument, rgb, StandardFonts, degrees } from "https://esm.sh/pdf-lib@1.17.1";
+import fontkit from "https://esm.sh/@pdf-lib/fontkit@1.1.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -100,8 +101,40 @@ serve(async (req) => {
       
       // Create a new PDF document
       const pdfDoc = await PDFDocument.create();
+      
+      // Register fontkit for custom font embedding
+      pdfDoc.registerFontkit(fontkit);
+      
+      // Load Hebrew-supporting font (Rubik from Google Fonts)
+      const hebrewFontUrl = "https://fonts.gstatic.com/s/rubik/v28/iJWZBXyIfDnIV5PNhY1KTN7Z-Yh-B4i1UA.ttf";
+      const hebrewFontBoldUrl = "https://fonts.gstatic.com/s/rubik/v28/iJWZBXyIfDnIV5PNhY1KTN7Z-Yh-4oi1UA.ttf";
+      
+      let hebrewFont, hebrewBoldFont;
+      try {
+        const [fontResponse, boldFontResponse] = await Promise.all([
+          fetch(hebrewFontUrl),
+          fetch(hebrewFontBoldUrl)
+        ]);
+        
+        const fontBytes = await fontResponse.arrayBuffer();
+        const boldFontBytes = await boldFontResponse.arrayBuffer();
+        
+        hebrewFont = await pdfDoc.embedFont(fontBytes);
+        hebrewBoldFont = await pdfDoc.embedFont(boldFontBytes);
+        console.log("Hebrew fonts loaded successfully");
+      } catch (fontError) {
+        console.error("Failed to load Hebrew fonts, falling back to standard fonts:", fontError);
+        hebrewFont = null;
+        hebrewBoldFont = null;
+      }
+      
+      // Standard fonts for fallback and ASCII text
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      
+      // Use Hebrew fonts if available, otherwise fallback
+      const coverTitleFont = hebrewBoldFont || boldFont;
+      const coverTextFont = hebrewFont || font;
 
       // Add metadata watermark (hidden but traceable)
       pdfDoc.setTitle(`Protected Document - ${userId}`);
@@ -129,14 +162,14 @@ serve(async (req) => {
         color: rgb(0.97, 0.97, 0.98),
       });
 
-      // Title section - handle Hebrew/Unicode text
+      // Title section - Hebrew text support
       const titleText = fileNameWithoutExt;
       const titleFontSize = 28;
       
-      // Try to calculate width, but use fallback if font doesn't support the characters
+      // Calculate width using the Hebrew font
       let titleWidth = coverWidth * 0.6; // Default fallback width
       try {
-        titleWidth = boldFont.widthOfTextAtSize(titleText, titleFontSize);
+        titleWidth = coverTitleFont.widthOfTextAtSize(titleText, titleFontSize);
       } catch (e) {
         console.log("Could not calculate title width, using default positioning");
       }
@@ -145,7 +178,7 @@ serve(async (req) => {
         x: (coverWidth - titleWidth) / 2,
         y: coverHeight * 0.7,
         size: titleFontSize,
-        font: boldFont,
+        font: coverTitleFont,
         color: rgb(0.2, 0.2, 0.3),
       });
 
@@ -157,50 +190,57 @@ serve(async (req) => {
         color: rgb(0.3, 0.4, 0.6),
       });
 
-      // User details section
+      // User details section - Hebrew labels
       const detailsFontSize = 16;
       const detailsY = coverHeight * 0.5;
       const detailsLineHeight = 35;
 
-      // Email - simple centered layout
-      coverPage.drawText("Email:", {
-        x: coverWidth * 0.3,
+      // Email - with Hebrew label "אימייל:"
+      const emailLabel = "אימייל:";
+      let emailLabelWidth = 50;
+      try {
+        emailLabelWidth = coverTitleFont.widthOfTextAtSize(emailLabel, detailsFontSize);
+      } catch (e) {}
+      
+      coverPage.drawText(emailLabel, {
+        x: coverWidth * 0.65,
         y: detailsY,
         size: detailsFontSize,
-        font: boldFont,
+        font: coverTitleFont,
         color: rgb(0.3, 0.3, 0.4),
       });
       coverPage.drawText(email, {
-        x: coverWidth * 0.45,
+        x: coverWidth * 0.25,
         y: detailsY,
         size: detailsFontSize,
-        font: font,
+        font: coverTextFont,
         color: rgb(0.4, 0.4, 0.5),
       });
 
-      // ID - simple centered layout
-      coverPage.drawText("ID:", {
-        x: coverWidth * 0.3,
+      // ID - with Hebrew label "תעודת זהות:"
+      const idLabel = "תעודת זהות:";
+      coverPage.drawText(idLabel, {
+        x: coverWidth * 0.58,
         y: detailsY - detailsLineHeight,
         size: detailsFontSize,
-        font: boldFont,
+        font: coverTitleFont,
         color: rgb(0.3, 0.3, 0.4),
       });
       coverPage.drawText(userId, {
-        x: coverWidth * 0.45,
+        x: coverWidth * 0.35,
         y: detailsY - detailsLineHeight,
         size: detailsFontSize,
-        font: font,
+        font: coverTextFont,
         color: rgb(0.4, 0.4, 0.5),
       });
 
-      // Success message at bottom - simple centered
-      const successText = "Good Luck!";
+      // Success message at bottom - Hebrew "!בהצלחה"
+      const successText = "בהצלחה!";
       const successFontSize = 24;
       
-      let successWidth = coverWidth * 0.3; // Default fallback
+      let successWidth = coverWidth * 0.2; // Default fallback
       try {
-        successWidth = boldFont.widthOfTextAtSize(successText, successFontSize);
+        successWidth = coverTitleFont.widthOfTextAtSize(successText, successFontSize);
       } catch (e) {
         console.log("Could not calculate success text width, using default positioning");
       }
@@ -209,7 +249,7 @@ serve(async (req) => {
         x: (coverWidth - successWidth) / 2,
         y: coverHeight * 0.15,
         size: successFontSize,
-        font: boldFont,
+        font: coverTitleFont,
         color: rgb(0.3, 0.5, 0.7),
       });
 
