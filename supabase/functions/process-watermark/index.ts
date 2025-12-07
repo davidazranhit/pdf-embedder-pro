@@ -470,14 +470,49 @@ serve(async (req) => {
     if (Array.isArray(body.fileIds)) {
       for (const fp of body.fileIds as string[]) {
         try {
-          const processedId = await processOne(fp);
+          // Get the original Hebrew name from pdf_templates table
+          let displayName: string | undefined;
+          
+          // Extract base filename from path for matching
+          const pathFileName = fp.split('/').pop() || '';
+          
+          // Try to find the template with this file_path
+          const { data: templateData } = await supabase
+            .from('pdf_templates')
+            .select('name, file_path')
+            .eq('file_path', fp)
+            .maybeSingle();
+          
+          if (templateData?.name) {
+            displayName = templateData.name;
+            console.log("Found template name:", displayName, "for path:", fp);
+          } else {
+            console.log("No template found for path:", fp, "- using filename from path");
+          }
+          
+          const processedId = await processOne(fp, displayName);
           filesOut.push({ originalId: fp, processedId });
         } catch (err) {
           console.error('Error processing file', fp, err);
         }
       }
     } else if (body.filePath) {
-      const processedId = await processOne(body.filePath, body.fileName);
+      // For single file, also try to get name from DB
+      let displayName = body.fileName;
+      
+      if (!displayName) {
+        const { data: templateData } = await supabase
+          .from('pdf_templates')
+          .select('name')
+          .eq('file_path', body.filePath)
+          .maybeSingle();
+        
+        if (templateData?.name) {
+          displayName = templateData.name;
+        }
+      }
+      
+      const processedId = await processOne(body.filePath, displayName);
       filesOut.push({ processedId });
     } else {
       return new Response(JSON.stringify({ error: 'No files provided' }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
