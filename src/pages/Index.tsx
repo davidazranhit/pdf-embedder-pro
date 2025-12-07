@@ -26,7 +26,7 @@ interface Template {
 const Index = () => {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [selectedTemplates, setSelectedTemplates] = useState<Template[]>([]);
-  const [processedFiles, setProcessedFiles] = useState<string[]>([]);
+  const [processedFiles, setProcessedFiles] = useState<{processedId: string; originalName?: string}[]>([]);
   const [email, setEmail] = useState("");
   const [userId, setUserId] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -169,7 +169,11 @@ const Index = () => {
       console.log("Process watermark response:", { data, error });
       if (error) throw error;
 
-      const processed = data.files.map((f: any) => f.processedId);
+      // Store full file info including originalName
+      const processed = data.files.map((f: any) => ({
+        processedId: f.processedId,
+        originalName: f.originalName
+      }));
       setProcessedFiles(processed);
       
       setFiles((prev) => prev.map((f) => ({ ...f, status: "completed" as const })));
@@ -193,7 +197,7 @@ const Index = () => {
 
   const handleSendEmail = async () => {
     // Determine which files to send
-    let fileIdsToSend: string[] = [];
+    let filesToSend: {processedId: string; originalName?: string}[] = [];
     
     if (sendWithoutWatermark) {
       // Send original files
@@ -209,7 +213,7 @@ const Index = () => {
       // Collect original file paths
       for (const fileItem of files) {
         if (fileItem.source === "template" && fileItem.templatePath) {
-          fileIdsToSend.push(fileItem.templatePath);
+          filesToSend.push({ processedId: fileItem.templatePath, originalName: fileItem.name });
         } else if (fileItem.source === "upload" && fileItem.file) {
           // Need to upload first if not already uploaded
           const fileName = buildStoragePath('uploads', fileItem.file.name);
@@ -218,7 +222,7 @@ const Index = () => {
             .upload(fileName, fileItem.file, { upsert: true });
           
           if (!uploadError) {
-            fileIdsToSend.push(fileName);
+            filesToSend.push({ processedId: fileName, originalName: fileItem.file.name });
           }
         }
       }
@@ -232,10 +236,10 @@ const Index = () => {
         });
         return;
       }
-      fileIdsToSend = processedFiles;
+      filesToSend = processedFiles;
     }
 
-    if (fileIdsToSend.length === 0) {
+    if (filesToSend.length === 0) {
       toast({
         title: "שגיאה",
         description: "לא נמצאו קבצים לשליחה",
@@ -247,14 +251,14 @@ const Index = () => {
     setIsSending(true);
     try {
       const { error } = await supabase.functions.invoke("send-watermarked-files", {
-        body: { email, fileIds: fileIdsToSend },
+        body: { email, fileIds: filesToSend },
       });
 
       if (error) throw error;
 
       toast({
         title: "נשלח בהצלחה!",
-        description: `${fileIdsToSend.length} קבצים נשלחו ל-${email}`,
+        description: `${filesToSend.length} קבצים נשלחו ל-${email}`,
       });
     } catch (error) {
       console.error("Send error:", error);
@@ -270,7 +274,7 @@ const Index = () => {
 
   const handleDownloadAll = async () => {
     // Determine which files to download
-    let fileIdsToDownload: string[] = [];
+    let filesToDownload: {path: string; name: string}[] = [];
     
     if (sendWithoutWatermark) {
       // Download original files
@@ -286,7 +290,7 @@ const Index = () => {
       // Collect original file paths
       for (const fileItem of files) {
         if (fileItem.source === "template" && fileItem.templatePath) {
-          fileIdsToDownload.push(fileItem.templatePath);
+          filesToDownload.push({ path: fileItem.templatePath, name: fileItem.name });
         } else if (fileItem.source === "upload" && fileItem.file) {
           // Need to upload first if not already uploaded
           const fileName = buildStoragePath('uploads', fileItem.file.name);
@@ -295,7 +299,7 @@ const Index = () => {
             .upload(fileName, fileItem.file, { upsert: true });
           
           if (!uploadError) {
-            fileIdsToDownload.push(fileName);
+            filesToDownload.push({ path: fileName, name: fileItem.file.name });
           }
         }
       }
@@ -309,10 +313,13 @@ const Index = () => {
         });
         return;
       }
-      fileIdsToDownload = processedFiles;
+      filesToDownload = processedFiles.map(f => ({
+        path: f.processedId,
+        name: f.originalName || f.processedId.split('/').pop() || 'document.pdf'
+      }));
     }
 
-    if (fileIdsToDownload.length === 0) {
+    if (filesToDownload.length === 0) {
       toast({
         title: "שגיאה",
         description: "לא נמצאו קבצים להורדה",
@@ -322,20 +329,20 @@ const Index = () => {
     }
 
     try {
-      for (const filePath of fileIdsToDownload) {
+      for (const file of filesToDownload) {
         const { data, error } = await supabase.storage
           .from("pdf-files")
-          .download(filePath);
+          .download(file.path);
 
         if (error) throw error;
 
-        // Extract the filename from the path (already includes userId)
-        const fileName = filePath.split("/").pop() || "document.pdf";
+        // Use the original name (Hebrew) for download
+        const downloadName = file.name.endsWith('.pdf') ? file.name : `${file.name}.pdf`;
 
         const url = URL.createObjectURL(data);
         const a = document.createElement("a");
         a.href = url;
-        a.download = fileName;
+        a.download = downloadName;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -344,7 +351,7 @@ const Index = () => {
 
       toast({
         title: "הורדה החלה",
-        description: `מוריד ${fileIdsToDownload.length} קבצים`,
+        description: `מוריד ${filesToDownload.length} קבצים`,
       });
     } catch (error) {
       console.error("Download error:", error);
@@ -358,7 +365,7 @@ const Index = () => {
 
   const handleManualEmail = async () => {
     // Determine which files to send
-    let fileIdsToSend: string[] = [];
+    let filesToSend: {processedId: string; originalName?: string}[] = [];
     
     if (sendWithoutWatermark) {
       // Send original files
@@ -374,7 +381,7 @@ const Index = () => {
       // Collect original file paths
       for (const fileItem of files) {
         if (fileItem.source === "template" && fileItem.templatePath) {
-          fileIdsToSend.push(fileItem.templatePath);
+          filesToSend.push({ processedId: fileItem.templatePath, originalName: fileItem.name });
         } else if (fileItem.source === "upload" && fileItem.file) {
           // Need to upload first if not already uploaded
           const fileName = buildStoragePath('uploads', fileItem.file.name);
@@ -383,7 +390,7 @@ const Index = () => {
             .upload(fileName, fileItem.file, { upsert: true });
           
           if (!uploadError) {
-            fileIdsToSend.push(fileName);
+            filesToSend.push({ processedId: fileName, originalName: fileItem.file.name });
           }
         }
       }
@@ -397,10 +404,10 @@ const Index = () => {
         });
         return;
       }
-      fileIdsToSend = processedFiles;
+      filesToSend = processedFiles;
     }
 
-    if (fileIdsToSend.length === 0) {
+    if (filesToSend.length === 0) {
       toast({
         title: "שגיאה",
         description: "לא נמצאו קבצים לשליחה",
@@ -413,31 +420,19 @@ const Index = () => {
       // Create signed URLs for all files
       const links: { name: string; url: string }[] = [];
 
-      for (const fileId of fileIdsToSend) {
-        const processedFileName = fileId.split('/').pop() || 'document.pdf';
-        const fileNameWithoutUserId = processedFileName.replace(/_[^_]+\.pdf$/, '.pdf');
-        
-        const { data: templateData } = await supabase
-          .from('pdf_templates')
-          .select('name, file_path')
-          .ilike('file_path', `%${fileNameWithoutUserId}%`)
-          .maybeSingle();
-
-        let finalFileName = processedFileName;
-        if (templateData?.name) {
-          // Use exact system name (preserve Hebrew and spaces)
-          finalFileName = templateData.name.endsWith('.pdf') ? templateData.name : `${templateData.name}.pdf`;
-        } else {
-          // Uploaded file without template match: use original base name without userId suffix
-          finalFileName = processedFileName.replace(/_[^_]+\.pdf$/i, '.pdf');
+      for (const file of filesToSend) {
+        // Use the original name if available
+        let finalFileName = file.originalName || file.processedId.split('/').pop() || 'document.pdf';
+        if (!finalFileName.endsWith('.pdf')) {
+          finalFileName = `${finalFileName}.pdf`;
         }
 
         const { data: signed, error: signedError } = await supabase.storage
           .from('pdf-files')
-          .createSignedUrl(fileId, 60 * 60 * 24 * 3);
+          .createSignedUrl(file.processedId, 60 * 60 * 24 * 3);
 
         if (signedError || !signed?.signedUrl) {
-          console.error('Error creating signed URL for', fileId, signedError);
+          console.error('Error creating signed URL for', file.processedId, signedError);
           continue;
         }
 

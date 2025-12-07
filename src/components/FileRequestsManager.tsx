@@ -223,14 +223,17 @@ export const FileRequestsManager = () => {
         return;
       }
 
-      // Extract processed file paths
-      const processedFilePaths = processData.files.map((f: any) => f.processedId);
+      // Extract processed file info with original names
+      const processedFiles = processData.files.map((f: any) => ({
+        processedId: f.processedId,
+        originalName: f.originalName
+      }));
 
-      // Send email with all processed files
+      // Send email with all processed files (including original names)
       const { error: sendError } = await supabase.functions.invoke("send-watermarked-files", {
         body: {
           email: selectedRequest.email,
-          fileIds: processedFilePaths,
+          fileIds: processedFiles,
         },
       });
 
@@ -255,7 +258,7 @@ export const FileRequestsManager = () => {
 
       toast({
         title: "הצלחה",
-        description: `${processedFilePaths.length} קבצים נשלחו בהצלחה`,
+        description: `${processedFiles.length} קבצים נשלחו בהצלחה`,
       });
 
       setShowTemplateDialog(false);

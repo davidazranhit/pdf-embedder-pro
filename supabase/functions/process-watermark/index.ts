@@ -465,16 +465,13 @@ serve(async (req) => {
       return processedPath;
     };
 
-    let filesOut: { originalId?: string; processedId: string }[] = [];
+    let filesOut: { originalId?: string; processedId: string; originalName?: string }[] = [];
 
     if (Array.isArray(body.fileIds)) {
       for (const fp of body.fileIds as string[]) {
         try {
           // Get the original Hebrew name from pdf_templates table
           let displayName: string | undefined;
-          
-          // Extract base filename from path for matching
-          const pathFileName = fp.split('/').pop() || '';
           
           // Try to find the template with this file_path
           const { data: templateData } = await supabase
@@ -491,13 +488,14 @@ serve(async (req) => {
           }
           
           const processedId = await processOne(fp, displayName);
-          filesOut.push({ originalId: fp, processedId });
+          // Return the original name so send-watermarked-files can use it
+          filesOut.push({ originalId: fp, processedId, originalName: displayName });
         } catch (err) {
           console.error('Error processing file', fp, err);
         }
       }
     } else if (body.filePath) {
-      // For single file, also try to get name from DB
+      // For single file, use provided fileName or look up from DB
       let displayName = body.fileName;
       
       if (!displayName) {
@@ -512,8 +510,10 @@ serve(async (req) => {
         }
       }
       
+      console.log("Single file processing - displayName:", displayName, "for path:", body.filePath);
+      
       const processedId = await processOne(body.filePath, displayName);
-      filesOut.push({ processedId });
+      filesOut.push({ processedId, originalName: displayName });
     } else {
       return new Response(JSON.stringify({ error: 'No files provided' }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
     }

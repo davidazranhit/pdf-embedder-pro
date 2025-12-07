@@ -53,32 +53,49 @@ serve(async (req) => {
     // Build signed download links instead of attaching files to avoid memory limits
     const links: { name: string; url: string }[] = [];
 
-    for (const fileId of fileIds) {
+    // fileIds can be either strings or objects with {processedId, originalName}
+    for (const fileItem of fileIds) {
       try {
-        // Derive final (Hebrew) file name with userId from processed filename
-        const processedFileName = fileId.split('/').pop() || 'document.pdf';
-        const fileNameWithoutUserId = processedFileName.replace(/_[^_]+\.pdf$/, '.pdf');
-        const userIdFromFile = processedFileName.match(/_([^_]+)\.pdf$/)?.[1] || '';
+        // Support both old format (string) and new format (object with originalName)
+        const fileId = typeof fileItem === 'string' ? fileItem : (fileItem as any).processedId || fileItem;
+        const providedName = typeof fileItem === 'object' ? (fileItem as any).originalName : undefined;
         
-        const { data: templateData } = await supabase
-          .from('pdf_templates')
-          .select('name, file_path')
-          .ilike('file_path', `%${fileNameWithoutUserId}%`)
-          .maybeSingle();
-
-        let finalFileName = processedFileName;
-        if (templateData?.name) {
-          // Use the exact name stored in the system (preserve Hebrew and spaces)
-          finalFileName = templateData.name.endsWith('.pdf') ? templateData.name : `${templateData.name}.pdf`;
+        let finalFileName: string;
+        
+        if (providedName) {
+          // Use the provided original name (Hebrew name from system)
+          finalFileName = providedName.endsWith('.pdf') ? providedName : `${providedName}.pdf`;
+          console.log("Using provided original name:", finalFileName);
         } else {
-          // Uploaded file without template match: use original base name without userId suffix
-          finalFileName = processedFileName.replace(/_[^_]+\.pdf$/i, '.pdf');
+          // Fallback: try to find from template table by matching file path
+          const processedFileName = (typeof fileId === 'string' ? fileId : '').split('/').pop() || 'document.pdf';
+          
+          // Extract the base template file ID from the processed path
+          // Format is usually: processed/file-xxx_userId.pdf -> templates/file-xxx.pdf
+          const baseMatch = processedFileName.match(/^(.+?)_[^_]+\.pdf$/);
+          const templateFileName = baseMatch ? `${baseMatch[1]}.pdf` : processedFileName;
+          
+          const { data: templateData } = await supabase
+            .from('pdf_templates')
+            .select('name, file_path')
+            .ilike('file_path', `%${templateFileName}%`)
+            .maybeSingle();
+
+          if (templateData?.name) {
+            finalFileName = templateData.name.endsWith('.pdf') ? templateData.name : `${templateData.name}.pdf`;
+            console.log("Found template name from DB:", finalFileName);
+          } else {
+            // Use original processed filename as fallback
+            finalFileName = processedFileName;
+            console.log("Using processed filename as fallback:", finalFileName);
+          }
         }
 
         // Create a signed URL valid for 3 days
+        const actualFileId = typeof fileId === 'string' ? fileId : '';
         const { data: signed, error: signedError } = await supabase.storage
           .from('pdf-files')
-          .createSignedUrl(fileId, 60 * 60 * 24 * 3);
+          .createSignedUrl(actualFileId, 60 * 60 * 24 * 3);
         if (signedError || !signed?.signedUrl) {
           console.error('Error creating signed URL for', fileId, signedError);
           continue;
@@ -93,7 +110,7 @@ serve(async (req) => {
 
         links.push({ name: finalFileName, url: finalUrl });
       } catch (err) {
-        console.error('Error preparing link for', fileId, err);
+        console.error('Error preparing link for', fileItem, err);
       }
     }
 
