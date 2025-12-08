@@ -457,11 +457,95 @@ const Settings = () => {
             </Card>
 
             {/* Preview Panel */}
-            <Card className="p-8 shadow-lg border-border/50">
+            <Card className="p-8 shadow-lg border-border/50 space-y-8">
+              {/* Cover Page Preview */}
               <div>
+                <h2 className="text-2xl font-semibold text-foreground mb-6">
+                  תצוגה מקדימה - דף כריכה
+                </h2>
+                <div className="relative border-2 border-border rounded-lg bg-white aspect-[3/4] overflow-hidden">
+                  {/* Cover Page Background */}
+                  <div 
+                    className="absolute top-0 left-0 right-0 h-[40%]"
+                    style={{ backgroundColor: 'rgb(247, 247, 250)' }}
+                  />
+                  
+                  {/* Title */}
+                  <div className="absolute top-[30%] left-0 right-0 text-center">
+                    <h2 
+                      className="text-xl md:text-2xl font-bold mb-2"
+                      style={{ color: 'rgb(51, 51, 77)' }}
+                    >
+                      חזרה על החומר אלגברת היחסים
+                    </h2>
+                    <div 
+                      className="mx-auto w-2/5 h-0.5"
+                      style={{ backgroundColor: 'rgb(77, 102, 153)' }}
+                    />
+                  </div>
+
+                  {/* User Details */}
+                  <div className="absolute top-[50%] left-0 right-0 px-8 text-right" dir="rtl">
+                    <div className="mb-4">
+                      <span 
+                        className="font-bold text-sm md:text-base"
+                        style={{ color: 'rgb(77, 77, 102)' }}
+                      >
+                        אימייל:
+                      </span>
+                      <span 
+                        className="mr-2 text-sm md:text-base"
+                        style={{ color: 'rgb(102, 102, 128)' }}
+                      >
+                        example@email.com
+                      </span>
+                    </div>
+                    <div>
+                      <span 
+                        className="font-bold text-sm md:text-base"
+                        style={{ color: 'rgb(77, 77, 102)' }}
+                      >
+                        תעודת זהות:
+                      </span>
+                      <span 
+                        className="mr-2 text-sm md:text-base"
+                        style={{ color: 'rgb(102, 102, 128)' }}
+                      >
+                        123456789
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Success Message */}
+                  <div className="absolute bottom-[15%] left-0 right-0 text-center">
+                    <span 
+                      className="text-lg md:text-xl font-bold"
+                      style={{ color: 'rgb(77, 128, 179)' }}
+                    >
+                      בהצלחה!
+                    </span>
+                  </div>
+
+                  {/* Decorative Dots */}
+                  <div 
+                    className="absolute bottom-[15%] left-[25%] w-2 h-2 rounded-full"
+                    style={{ backgroundColor: 'rgb(77, 128, 179)' }}
+                  />
+                  <div 
+                    className="absolute bottom-[15%] right-[25%] w-2 h-2 rounded-full"
+                    style={{ backgroundColor: 'rgb(77, 128, 179)' }}
+                  />
+                </div>
+                <p className="text-sm text-muted-foreground mt-4 text-center">
+                  דף הכריכה מוצג לפני תוכן הקובץ המקורי. שם הקובץ מופיע כפי שנשמר במערכת.
+                </p>
+              </div>
+
+              {/* Watermark Preview */}
+              <div className="pt-6 border-t border-border">
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-semibold text-foreground">
-                    תצוגה מקדימה
+                    תצוגה מקדימה - Watermarks
                   </h2>
                   <div className="flex items-center gap-2">
                     <Label className="text-sm text-foreground">הצג נסתרים</Label>

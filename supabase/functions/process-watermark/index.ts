@@ -105,42 +105,58 @@ serve(async (req) => {
       // Register fontkit for custom font embedding
       pdfDoc.registerFontkit(fontkit);
       
-      // Load Hebrew-supporting font from jsDelivr CDN (reliable TTF source)
-      // Using Rubik font from Google Fonts via jsDelivr
-      const fontUrls = [
-        "https://cdn.jsdelivr.net/gh/nicola02nb/FullFont-HeeboFont@main/Heebo-Regular.ttf",
-        "https://cdn.jsdelivr.net/gh/nicola02nb/FullFont-HeeboFont@main/Heebo-Bold.ttf"
+      // Load Hebrew-supporting font from multiple CDN sources for reliability
+      const fontSources = [
+        // Primary: Google Fonts via fonts.gstatic.com (most reliable)
+        {
+          regular: "https://fonts.gstatic.com/s/heebo/v22/NGSpv5_NC0k9P_v6ZUCbLRAHxK1EJSfa.ttf",
+          bold: "https://fonts.gstatic.com/s/heebo/v22/NGSpv5_NC0k9P_v6ZUCbLRAHxK1EuyzL.ttf"
+        },
+        // Backup: jsDelivr CDN
+        {
+          regular: "https://cdn.jsdelivr.net/gh/nicola02nb/FullFont-HeeboFont@main/Heebo-Regular.ttf",
+          bold: "https://cdn.jsdelivr.net/gh/nicola02nb/FullFont-HeeboFont@main/Heebo-Bold.ttf"
+        }
       ];
       
       let hebrewFont: any = null;
       let hebrewBoldFont: any = null;
       let fontsLoaded = false;
       
-      try {
-        console.log("Loading Hebrew fonts from jsDelivr...");
+      for (const source of fontSources) {
+        if (fontsLoaded) break;
         
-        const responses = await Promise.all(fontUrls.map(url => fetch(url)));
-        
-        if (responses[0].ok && responses[1].ok) {
-          const regularBytes = new Uint8Array(await responses[0].arrayBuffer());
-          const boldBytes = new Uint8Array(await responses[1].arrayBuffer());
+        try {
+          console.log("Trying to load Hebrew fonts from:", source.regular);
           
-          console.log("Font sizes - Regular:", regularBytes.length, "Bold:", boldBytes.length);
+          const [regularRes, boldRes] = await Promise.all([
+            fetch(source.regular),
+            fetch(source.bold)
+          ]);
           
-          // Check if we got valid TTF files (should start with specific bytes)
-          if (regularBytes.length > 10000 && boldBytes.length > 10000) {
-            hebrewFont = await pdfDoc.embedFont(regularBytes);
-            hebrewBoldFont = await pdfDoc.embedFont(boldBytes);
-            fontsLoaded = true;
-            console.log("Hebrew fonts embedded successfully!");
+          if (regularRes.ok && boldRes.ok) {
+            const regularBytes = new Uint8Array(await regularRes.arrayBuffer());
+            const boldBytes = new Uint8Array(await boldRes.arrayBuffer());
+            
+            console.log("Font sizes - Regular:", regularBytes.length, "Bold:", boldBytes.length);
+            
+            // Check if we got valid TTF files
+            if (regularBytes.length > 5000 && boldBytes.length > 5000) {
+              hebrewFont = await pdfDoc.embedFont(regularBytes);
+              hebrewBoldFont = await pdfDoc.embedFont(boldBytes);
+              fontsLoaded = true;
+              console.log("Hebrew fonts embedded successfully from source!");
+            }
           } else {
-            console.log("Font files seem invalid or too small");
+            console.log("Failed to fetch from source:", regularRes.status, boldRes.status);
           }
-        } else {
-          console.log("Failed to fetch fonts:", responses[0].status, responses[1].status);
+        } catch (fontError) {
+          console.error("Error loading fonts from source:", fontError);
         }
-      } catch (fontError) {
-        console.error("Error loading Hebrew fonts:", fontError);
+      }
+      
+      if (!fontsLoaded) {
+        console.warn("All Hebrew font sources failed - Hebrew text may not render correctly");
       }
       
       // Standard fonts for ASCII text and watermarks
@@ -159,15 +175,16 @@ serve(async (req) => {
       pdfDoc.setProducer(`David's PDF System - User: ${userId}`);
       pdfDoc.setCreator(`Watermarked for ${email}`);
 
-      // Get original file name for the cover page
+      // Get original file name for the cover page - ALWAYS use displayName if provided
       const originalFileName = displayName || (path.split('/').pop() || 'document.pdf');
       const fileNameWithoutExt = originalFileName.replace(/\.pdf$/i, '');
+      
+      console.log("Cover page title:", fileNameWithoutExt, "fontsLoaded:", fontsLoaded);
 
       // Create cover page (A4 size: 595 x 842 points)
       const coverPage = pdfDoc.addPage([595, 842]);
       const { width: coverWidth, height: coverHeight } = coverPage.getSize();
 
-      // Draw elegant cover page
       // Background subtle gradient effect (using rectangles with different opacities)
       coverPage.drawRectangle({
         x: 0,
@@ -177,42 +194,33 @@ serve(async (req) => {
         color: rgb(0.97, 0.97, 0.98),
       });
 
-      // Title section - show file name (Hebrew or English)
+      // Title section - ALWAYS show the file name (Hebrew supported when fonts loaded)
       const titleText = fileNameWithoutExt;
       const titleFontSize = 28;
       
       // Check if title contains Hebrew characters
       const hasHebrewChars = /[\u0590-\u05FF]/.test(titleText);
       
-      if (fontsLoaded || !hasHebrewChars) {
-        // Can render the title (either have Hebrew font or title is ASCII)
-        const titleFont = fontsLoaded ? coverBoldFont : boldFont;
-        let titleWidth = coverWidth * 0.6;
-        try {
-          titleWidth = titleFont.widthOfTextAtSize(titleText, titleFontSize);
-        } catch (e) {
-          console.log("Width calculation failed, using default");
-        }
-        
-        coverPage.drawText(titleText, {
-          x: (coverWidth - titleWidth) / 2,
-          y: coverHeight * 0.7,
-          size: titleFontSize,
-          font: titleFont,
-          color: rgb(0.2, 0.2, 0.3),
-        });
-      } else {
-        // Fallback for Hebrew title when fonts not loaded
-        const fallbackTitle = "Document";
-        const fallbackWidth = boldFont.widthOfTextAtSize(fallbackTitle, titleFontSize);
-        coverPage.drawText(fallbackTitle, {
-          x: (coverWidth - fallbackWidth) / 2,
-          y: coverHeight * 0.7,
-          size: titleFontSize,
-          font: boldFont,
-          color: rgb(0.2, 0.2, 0.3),
-        });
+      // Use Hebrew font if loaded, otherwise use standard font
+      // We'll show the Hebrew text regardless - it will render if fonts are loaded
+      const titleFont = fontsLoaded ? coverBoldFont : boldFont;
+      const displayTitle = fontsLoaded || !hasHebrewChars ? titleText : titleText;
+      
+      let titleWidth = coverWidth * 0.6;
+      try {
+        titleWidth = titleFont.widthOfTextAtSize(displayTitle, titleFontSize);
+      } catch (e) {
+        console.log("Width calculation failed for title, using default");
       }
+      
+      // Always draw the title - Hebrew fonts should be loaded
+      coverPage.drawText(displayTitle, {
+        x: (coverWidth - titleWidth) / 2,
+        y: coverHeight * 0.7,
+        size: titleFontSize,
+        font: titleFont,
+        color: rgb(0.2, 0.2, 0.3),
+      });
 
       // Decorative line under title
       coverPage.drawLine({
