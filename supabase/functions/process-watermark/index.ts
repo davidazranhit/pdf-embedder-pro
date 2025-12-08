@@ -106,16 +106,22 @@ serve(async (req) => {
       pdfDoc.registerFontkit(fontkit);
       
       // Load Hebrew-supporting font from multiple CDN sources for reliability
+      // Using direct raw GitHub URLs for Noto Sans Hebrew (known working URLs)
       const fontSources = [
-        // Primary: Google Fonts via fonts.gstatic.com (most reliable)
+        // Noto Sans Hebrew from Google Fonts GitHub repo (verified working)
         {
-          regular: "https://fonts.gstatic.com/s/heebo/v22/NGSpv5_NC0k9P_v6ZUCbLRAHxK1EJSfa.ttf",
-          bold: "https://fonts.gstatic.com/s/heebo/v22/NGSpv5_NC0k9P_v6ZUCbLRAHxK1EuyzL.ttf"
+          regular: "https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf",
+          bold: "https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Bold.ttf"
         },
-        // Backup: jsDelivr CDN
+        // Alternative: David Libre font from Google Fonts
         {
-          regular: "https://cdn.jsdelivr.net/gh/nicola02nb/FullFont-HeeboFont@main/Heebo-Regular.ttf",
-          bold: "https://cdn.jsdelivr.net/gh/nicola02nb/FullFont-HeeboFont@main/Heebo-Bold.ttf"
+          regular: "https://raw.githubusercontent.com/nicola02nb/FullFont-HeeboFont/main/Heebo-Regular.ttf",
+          bold: "https://raw.githubusercontent.com/nicola02nb/FullFont-HeeboFont/main/Heebo-Bold.ttf"
+        },
+        // Direct from fonts.cdnfonts.com
+        {
+          regular: "https://fonts.cdnfonts.com/s/19158/Rubik-Regular.ttf",
+          bold: "https://fonts.cdnfonts.com/s/19158/Rubik-Bold.ttf"
         }
       ];
       
@@ -130,9 +136,15 @@ serve(async (req) => {
           console.log("Trying to load Hebrew fonts from:", source.regular);
           
           const [regularRes, boldRes] = await Promise.all([
-            fetch(source.regular),
-            fetch(source.bold)
+            fetch(source.regular, { 
+              headers: { 'Accept': '*/*' }
+            }),
+            fetch(source.bold, { 
+              headers: { 'Accept': '*/*' }
+            })
           ]);
+          
+          console.log("Font fetch status - Regular:", regularRes.status, "Bold:", boldRes.status);
           
           if (regularRes.ok && boldRes.ok) {
             const regularBytes = new Uint8Array(await regularRes.arrayBuffer());
@@ -140,15 +152,15 @@ serve(async (req) => {
             
             console.log("Font sizes - Regular:", regularBytes.length, "Bold:", boldBytes.length);
             
-            // Check if we got valid TTF files
+            // Check if we got valid TTF files (minimum reasonable size)
             if (regularBytes.length > 5000 && boldBytes.length > 5000) {
               hebrewFont = await pdfDoc.embedFont(regularBytes);
               hebrewBoldFont = await pdfDoc.embedFont(boldBytes);
               fontsLoaded = true;
               console.log("Hebrew fonts embedded successfully from source!");
+            } else {
+              console.log("Font files too small, trying next source");
             }
-          } else {
-            console.log("Failed to fetch from source:", regularRes.status, boldRes.status);
           }
         } catch (fontError) {
           console.error("Error loading fonts from source:", fontError);
@@ -156,7 +168,7 @@ serve(async (req) => {
       }
       
       if (!fontsLoaded) {
-        console.warn("All Hebrew font sources failed - Hebrew text may not render correctly");
+        console.warn("All Hebrew font sources failed - will skip Hebrew cover page elements");
       }
       
       // Standard fonts for ASCII text and watermarks
@@ -194,17 +206,17 @@ serve(async (req) => {
         color: rgb(0.97, 0.97, 0.98),
       });
 
-      // Title section - ALWAYS show the file name (Hebrew supported when fonts loaded)
+      // Title section - show file name
       const titleText = fileNameWithoutExt;
       const titleFontSize = 28;
       
       // Check if title contains Hebrew characters
       const hasHebrewChars = /[\u0590-\u05FF]/.test(titleText);
       
-      // Use Hebrew font if loaded, otherwise use standard font
-      // We'll show the Hebrew text regardless - it will render if fonts are loaded
+      // Only draw Hebrew text if fonts are loaded, otherwise show fallback
+      const canDrawTitle = fontsLoaded || !hasHebrewChars;
       const titleFont = fontsLoaded ? coverBoldFont : boldFont;
-      const displayTitle = fontsLoaded || !hasHebrewChars ? titleText : titleText;
+      const displayTitle = canDrawTitle ? titleText : "Document";
       
       let titleWidth = coverWidth * 0.6;
       try {
@@ -213,14 +225,28 @@ serve(async (req) => {
         console.log("Width calculation failed for title, using default");
       }
       
-      // Always draw the title - Hebrew fonts should be loaded
-      coverPage.drawText(displayTitle, {
-        x: (coverWidth - titleWidth) / 2,
-        y: coverHeight * 0.7,
-        size: titleFontSize,
-        font: titleFont,
-        color: rgb(0.2, 0.2, 0.3),
-      });
+      // Draw the title (only if we can render it properly)
+      try {
+        coverPage.drawText(displayTitle, {
+          x: (coverWidth - titleWidth) / 2,
+          y: coverHeight * 0.7,
+          size: titleFontSize,
+          font: titleFont,
+          color: rgb(0.2, 0.2, 0.3),
+        });
+      } catch (titleError) {
+        console.error("Error drawing title, using fallback:", titleError);
+        // Fallback to simple English text
+        const fallbackTitle = "Document";
+        const fallbackWidth = boldFont.widthOfTextAtSize(fallbackTitle, titleFontSize);
+        coverPage.drawText(fallbackTitle, {
+          x: (coverWidth - fallbackWidth) / 2,
+          y: coverHeight * 0.7,
+          size: titleFontSize,
+          font: boldFont,
+          color: rgb(0.2, 0.2, 0.3),
+        });
+      }
 
       // Decorative line under title
       coverPage.drawLine({
@@ -236,54 +262,63 @@ serve(async (req) => {
       const detailsLineHeight = 35;
 
       if (fontsLoaded) {
-        // Hebrew labels (RTL layout)
-        coverPage.drawText("אימייל:", {
-          x: coverWidth * 0.65,
-          y: detailsY,
-          size: detailsFontSize,
-          font: coverBoldFont,
-          color: rgb(0.3, 0.3, 0.4),
-        });
-        coverPage.drawText(email, {
-          x: coverWidth * 0.15,
-          y: detailsY,
-          size: detailsFontSize,
-          font: coverFont,
-          color: rgb(0.4, 0.4, 0.5),
-        });
-
-        coverPage.drawText("תעודת זהות:", {
-          x: coverWidth * 0.58,
-          y: detailsY - detailsLineHeight,
-          size: detailsFontSize,
-          font: coverBoldFont,
-          color: rgb(0.3, 0.3, 0.4),
-        });
-        coverPage.drawText(userId, {
-          x: coverWidth * 0.35,
-          y: detailsY - detailsLineHeight,
-          size: detailsFontSize,
-          font: coverFont,
-          color: rgb(0.4, 0.4, 0.5),
-        });
-
-        // Hebrew success message
-        const successText = "בהצלחה!";
-        const successFontSize = 24;
-        let successWidth = coverWidth * 0.15;
         try {
-          successWidth = coverBoldFont.widthOfTextAtSize(successText, successFontSize);
-        } catch (e) {}
-        
-        coverPage.drawText(successText, {
-          x: (coverWidth - successWidth) / 2,
-          y: coverHeight * 0.15,
-          size: successFontSize,
-          font: coverBoldFont,
-          color: rgb(0.3, 0.5, 0.7),
-        });
+          // Hebrew labels (RTL layout)
+          coverPage.drawText("אימייל:", {
+            x: coverWidth * 0.65,
+            y: detailsY,
+            size: detailsFontSize,
+            font: coverBoldFont,
+            color: rgb(0.3, 0.3, 0.4),
+          });
+          coverPage.drawText(email, {
+            x: coverWidth * 0.15,
+            y: detailsY,
+            size: detailsFontSize,
+            font: coverFont,
+            color: rgb(0.4, 0.4, 0.5),
+          });
+
+          coverPage.drawText("תעודת זהות:", {
+            x: coverWidth * 0.58,
+            y: detailsY - detailsLineHeight,
+            size: detailsFontSize,
+            font: coverBoldFont,
+            color: rgb(0.3, 0.3, 0.4),
+          });
+          coverPage.drawText(userId, {
+            x: coverWidth * 0.35,
+            y: detailsY - detailsLineHeight,
+            size: detailsFontSize,
+            font: coverFont,
+            color: rgb(0.4, 0.4, 0.5),
+          });
+
+          // Hebrew success message
+          const successText = "בהצלחה!";
+          const successFontSize = 24;
+          let successWidth = coverWidth * 0.15;
+          try {
+            successWidth = coverBoldFont.widthOfTextAtSize(successText, successFontSize);
+          } catch (e) {}
+          
+          coverPage.drawText(successText, {
+            x: (coverWidth - successWidth) / 2,
+            y: coverHeight * 0.15,
+            size: successFontSize,
+            font: coverBoldFont,
+            color: rgb(0.3, 0.5, 0.7),
+          });
+        } catch (hebrewError) {
+          console.error("Error drawing Hebrew labels, falling back to English:", hebrewError);
+          // Fall through to English labels
+          drawEnglishLabels();
+        }
       } else {
-        // English labels (LTR layout)
+        drawEnglishLabels();
+      }
+      
+      function drawEnglishLabels() {
         coverPage.drawText("Email:", {
           x: coverWidth * 0.25,
           y: detailsY,
