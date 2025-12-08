@@ -105,23 +105,23 @@ serve(async (req) => {
       // Register fontkit for custom font embedding
       pdfDoc.registerFontkit(fontkit);
       
-      // Load Hebrew-supporting font from multiple CDN sources for reliability
-      // Using direct raw GitHub URLs for Noto Sans Hebrew (known working URLs)
+      // Load Hebrew-supporting font that includes numbers and Latin characters
+      // Rubik font supports Hebrew, Latin, and numbers
       const fontSources = [
-        // Noto Sans Hebrew from Google Fonts GitHub repo (verified working)
+        // Rubik from cdnfonts (supports Hebrew + Latin + numbers)
         {
-          regular: "https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf",
-          bold: "https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Bold.ttf"
+          regular: "https://fonts.cdnfonts.com/s/19158/Rubik-Regular.ttf",
+          bold: "https://fonts.cdnfonts.com/s/19158/Rubik-Bold.ttf"
         },
-        // Alternative: David Libre font from Google Fonts
+        // Alternative: Heebo from raw GitHub
         {
           regular: "https://raw.githubusercontent.com/nicola02nb/FullFont-HeeboFont/main/Heebo-Regular.ttf",
           bold: "https://raw.githubusercontent.com/nicola02nb/FullFont-HeeboFont/main/Heebo-Bold.ttf"
         },
-        // Direct from fonts.cdnfonts.com
+        // Noto Sans Hebrew (Hebrew only, as last resort)
         {
-          regular: "https://fonts.cdnfonts.com/s/19158/Rubik-Regular.ttf",
-          bold: "https://fonts.cdnfonts.com/s/19158/Rubik-Bold.ttf"
+          regular: "https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf",
+          bold: "https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Bold.ttf"
         }
       ];
       
