@@ -175,70 +175,12 @@ serve(async (req) => {
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
       
-      // Helper function to reverse Hebrew text for proper RTL display in PDF
-      const reverseHebrewText = (text: string): string => {
-        return text.split('').reverse().join('');
-      };
-      
-      // Helper function to check if character is Hebrew
-      const isHebrewChar = (char: string): boolean => /[\u0590-\u05FF]/.test(char);
-      
-      // Helper function to check if character is a symbol/punctuation (not letter or number)
-      const isSymbol = (char: string): boolean => /[^\w\u0590-\u05FF\s]/.test(char);
-      
-      // Helper function to split text into segments by character type
-      type CharType = 'hebrew' | 'latin' | 'symbol';
-      const getCharType = (char: string): CharType => {
-        if (/[\u0590-\u05FF]/.test(char)) return 'hebrew';
-        if (/[^\w\s]/.test(char) && !/[\u0590-\u05FF]/.test(char)) return 'symbol';
-        return 'latin';
-      };
-      
-      const splitTextByType = (text: string): Array<{text: string, type: CharType}> => {
-        const segments: Array<{text: string, type: CharType}> = [];
-        let currentSegment = '';
-        let currentType: CharType = 'latin';
-        let hasStarted = false;
-        
-        for (const char of text) {
-          const charType = getCharType(char);
-          
-          // Treat spaces as part of the current segment
-          if (char === ' ') {
-            currentSegment += char;
-            continue;
-          }
-          
-          if (!hasStarted) {
-            currentType = charType;
-            currentSegment = char;
-            hasStarted = true;
-          } else if (charType === currentType) {
-            currentSegment += char;
-          } else {
-            if (currentSegment.trim()) {
-              segments.push({ text: currentSegment, type: currentType });
-            }
-            currentSegment = char;
-            currentType = charType;
-          }
-        }
-        
-        if (currentSegment.trim()) {
-          segments.push({ text: currentSegment, type: currentType });
-        }
-        
-        return segments;
-      };
-      
-      // Simple helper to draw text with proper RTL support for Hebrew
-      const drawTextWithRTL = (page: any, text: string, x: number, y: number, fontSize: number, useBold: boolean, color: any) => {
-        // Check if text contains Hebrew
-        const hasHebrew = /[\u0590-\u05FF]/.test(text);
-        
-        if (!fontsLoaded || !hasHebrew) {
-          // No Hebrew fonts or no Hebrew text - use standard font
-          page.drawText(text, {
+      // Simple helper to draw Hebrew text (just use Hebrew font, no reversal needed)
+      // PDF-lib handles the text as-is, the font contains proper glyph ordering
+      const drawHebrewText = (page: any, hebrewText: string, symbolText: string, x: number, y: number, fontSize: number, useBold: boolean, color: any, drawSymbolFirst: boolean = false) => {
+        if (!fontsLoaded) {
+          // Fallback to standard font
+          page.drawText(hebrewText + symbolText, {
             x, y,
             size: fontSize,
             font: useBold ? boldFont : font,
@@ -247,119 +189,117 @@ serve(async (req) => {
           return;
         }
         
-        // For pure Hebrew text (no mixed content), just reverse and draw
-        const hasLatin = /[a-zA-Z0-9]/.test(text);
+        const hebrewFontToUse = useBold ? hebrewBoldFont : hebrewFont;
         
-        if (!hasLatin) {
-          // Pure Hebrew with possibly some symbols
-          // Replace symbols with standard font equivalents by drawing separately
-          const segments = splitTextByType(text);
-          
-          // Reverse segments order for RTL
-          const reversedSegments = [...segments].reverse();
-          let currentX = x;
-          
-          // Calculate total width first
-          let totalWidth = 0;
-          for (const segment of segments) {
-            const segFont = segment.type === 'hebrew' ? (useBold ? hebrewBoldFont : hebrewFont) : (useBold ? boldFont : font);
-            const segText = segment.type === 'hebrew' ? segment.text : segment.text;
-            try {
-              totalWidth += segFont.widthOfTextAtSize(segText, fontSize);
-            } catch (e) {
-              totalWidth += fontSize * segText.length * 0.5;
-            }
+        if (drawSymbolFirst && symbolText) {
+          // Draw symbol first (e.g., "!" at the end for "בהצלחה!")
+          // For RTL, the "!" should appear on the left
+          let symbolWidth = 0;
+          try {
+            symbolWidth = font.widthOfTextAtSize(symbolText, fontSize);
+          } catch (e) {
+            symbolWidth = fontSize * symbolText.length * 0.3;
           }
           
-          currentX = x + totalWidth;
+          // Draw symbol with standard font
+          page.drawText(symbolText, {
+            x: x,
+            y,
+            size: fontSize,
+            font: useBold ? boldFont : font,
+            color,
+          });
           
-          for (const segment of reversedSegments) {
-            const segFont = segment.type === 'hebrew' ? (useBold ? hebrewBoldFont : hebrewFont) : (useBold ? boldFont : font);
-            // Reverse Hebrew text characters, keep symbols as-is
-            const segText = segment.type === 'hebrew' ? reverseHebrewText(segment.text) : segment.text;
-            
-            let segWidth = fontSize * segText.length * 0.5;
-            try {
-              segWidth = segFont.widthOfTextAtSize(segText, fontSize);
-            } catch (e) {}
-            
-            currentX -= segWidth;
-            
-            page.drawText(segText, {
-              x: currentX,
-              y,
-              size: fontSize,
-              font: segFont,
-              color,
-            });
+          // Draw Hebrew text after the symbol
+          page.drawText(hebrewText, {
+            x: x + symbolWidth,
+            y,
+            size: fontSize,
+            font: hebrewFontToUse,
+            color,
+          });
+        } else if (symbolText) {
+          // Draw Hebrew first, then symbol (e.g., "אימייל:")
+          let hebrewWidth = 0;
+          try {
+            hebrewWidth = hebrewFontToUse.widthOfTextAtSize(hebrewText, fontSize);
+          } catch (e) {
+            hebrewWidth = fontSize * hebrewText.length * 0.5;
           }
+          
+          // Draw Hebrew text
+          page.drawText(hebrewText, {
+            x: x,
+            y,
+            size: fontSize,
+            font: hebrewFontToUse,
+            color,
+          });
+          
+          // Draw symbol after Hebrew text with standard font
+          page.drawText(symbolText, {
+            x: x + hebrewWidth,
+            y,
+            size: fontSize,
+            font: useBold ? boldFont : font,
+            color,
+          });
         } else {
-          // Mixed Hebrew and Latin - complex case
-          const segments = splitTextByType(text);
-          
-          // For RTL layout, reverse the segment order
-          const reversedSegments = [...segments].reverse();
-          let currentX = x;
-          
-          // Calculate total width
-          let totalWidth = 0;
-          for (const segment of segments) {
-            const segFont = segment.type === 'hebrew' ? (useBold ? hebrewBoldFont : hebrewFont) : (useBold ? boldFont : font);
-            try {
-              totalWidth += segFont.widthOfTextAtSize(segment.text, fontSize);
-            } catch (e) {
-              totalWidth += fontSize * segment.text.length * 0.5;
-            }
-          }
-          
-          currentX = x + totalWidth;
-          
-          for (const segment of reversedSegments) {
-            const segFont = segment.type === 'hebrew' ? (useBold ? hebrewBoldFont : hebrewFont) : (useBold ? boldFont : font);
-            // Reverse Hebrew text characters
-            const segText = segment.type === 'hebrew' ? reverseHebrewText(segment.text) : segment.text;
-            
-            let segWidth = fontSize * segText.length * 0.5;
-            try {
-              segWidth = segFont.widthOfTextAtSize(segText, fontSize);
-            } catch (e) {}
-            
-            currentX -= segWidth;
-            
-            page.drawText(segText, {
-              x: currentX,
-              y,
-              size: fontSize,
-              font: segFont,
-              color,
-            });
-          }
+          // Just Hebrew text, no symbol
+          page.drawText(hebrewText, {
+            x, y,
+            size: fontSize,
+            font: hebrewFontToUse,
+            color,
+          });
         }
       };
       
-      // Helper to calculate mixed text width
-      const getMixedTextWidth = (text: string, fontSize: number, useBold: boolean): number => {
-        if (!fontsLoaded) {
-          try {
-            return (useBold ? boldFont : font).widthOfTextAtSize(text, fontSize);
-          } catch (e) {
-            return fontSize * text.length * 0.6;
-          }
+      // Helper to draw title text (just use the appropriate font based on content)
+      const drawTitleText = (page: any, text: string, x: number, y: number, fontSize: number, color: any) => {
+        const hasHebrew = /[\u0590-\u05FF]/.test(text);
+        
+        if (!fontsLoaded || !hasHebrew) {
+          page.drawText(text, {
+            x, y,
+            size: fontSize,
+            font: boldFont,
+            color,
+          });
+          return;
         }
         
-        const segments = splitTextByType(text);
-        let totalWidth = 0;
-        
-        for (const segment of segments) {
-          const segmentFont = segment.type === 'hebrew' ? (useBold ? hebrewBoldFont : hebrewFont) : (useBold ? boldFont : font);
-          try {
-            totalWidth += segmentFont.widthOfTextAtSize(segment.text, fontSize);
-          } catch (e) {
-            totalWidth += fontSize * segment.text.length * 0.6;
-          }
+        // For mixed content, draw the text as-is with Hebrew font
+        // The Hebrew font should handle the text properly
+        page.drawText(text, {
+          x, y,
+          size: fontSize,
+          font: hebrewBoldFont,
+          color,
+        });
+      };
+      
+      // Helper to get text width
+      const getTextWidth = (text: string, fontSize: number, useHebrew: boolean, useBold: boolean): number => {
+        const fontToUse = useHebrew && fontsLoaded 
+          ? (useBold ? hebrewBoldFont : hebrewFont)
+          : (useBold ? boldFont : font);
+        try {
+          return fontToUse.widthOfTextAtSize(text, fontSize);
+        } catch (e) {
+          return fontSize * text.length * 0.5;
         }
-        
-        return totalWidth;
+      };
+      
+      // Helper to calculate title width
+      const getTitleWidth = (text: string, fontSize: number): number => {
+        const hasHebrew = /[\u0590-\u05FF]/.test(text);
+        const fontToUse = hasHebrew && fontsLoaded ? hebrewBoldFont : boldFont;
+        try {
+          return fontToUse.widthOfTextAtSize(text, fontSize);
+        } catch (e) {
+          return fontSize * text.length * 0.5;
+        }
       };
 
       // Add metadata watermark (hidden but traceable)
@@ -389,21 +329,20 @@ serve(async (req) => {
         color: rgb(0.97, 0.97, 0.98),
       });
 
-      // Title section - show file name using mixed text support
+      // Title section - show file name
       const titleText = fileNameWithoutExt;
       const titleFontSize = 28;
       
       // Calculate title width for centering
-      const titleWidth = getMixedTextWidth(titleText, titleFontSize, true);
+      const titleWidth = getTitleWidth(titleText, titleFontSize);
       
       try {
-        drawTextWithRTL(
+        drawTitleText(
           coverPage, 
           titleText, 
           (coverWidth - titleWidth) / 2, 
           coverHeight * 0.7, 
           titleFontSize, 
-          true, 
           rgb(0.2, 0.2, 0.3)
         );
       } catch (titleError) {
@@ -435,14 +374,11 @@ serve(async (req) => {
 
       if (fontsLoaded) {
         try {
-          // Hebrew labels (RTL layout) - use Hebrew font for Hebrew text
-          coverPage.drawText("אימייל:", {
-            x: coverWidth * 0.65,
-            y: detailsY,
-            size: detailsFontSize,
-            font: hebrewBoldFont,
-            color: rgb(0.3, 0.3, 0.4),
-          });
+          // Draw "אימייל" with Hebrew font, then ":" with standard font
+          const emailLabelHebrew = "אימייל";
+          const emailLabelX = coverWidth * 0.65;
+          drawHebrewText(coverPage, emailLabelHebrew, ":", emailLabelX, detailsY, detailsFontSize, true, rgb(0.3, 0.3, 0.4), false);
+          
           // Use standard font for email (Latin characters)
           coverPage.drawText(email, {
             x: coverWidth * 0.15,
@@ -452,13 +388,11 @@ serve(async (req) => {
             color: rgb(0.4, 0.4, 0.5),
           });
 
-          coverPage.drawText("תעודת זהות:", {
-            x: coverWidth * 0.58,
-            y: detailsY - detailsLineHeight,
-            size: detailsFontSize,
-            font: hebrewBoldFont,
-            color: rgb(0.3, 0.3, 0.4),
-          });
+          // Draw "תעודת זהות" with Hebrew font, then ":" with standard font
+          const idLabelHebrew = "תעודת זהות";
+          const idLabelX = coverWidth * 0.55;
+          drawHebrewText(coverPage, idLabelHebrew, ":", idLabelX, detailsY - detailsLineHeight, detailsFontSize, true, rgb(0.3, 0.3, 0.4), false);
+          
           // Use standard font for ID (numbers)
           coverPage.drawText(userId, {
             x: coverWidth * 0.35,
@@ -468,21 +402,26 @@ serve(async (req) => {
             color: rgb(0.4, 0.4, 0.5),
           });
 
-          // Hebrew success message
-          const successText = "בהצלחה!";
+          // Draw "בהצלחה" with Hebrew font, then "!" with standard font
+          const successHebrew = "בהצלחה";
           const successFontSize = 24;
-          let successWidth = coverWidth * 0.15;
-          try {
-            successWidth = hebrewBoldFont.widthOfTextAtSize(successText, successFontSize);
-          } catch (e) {}
           
-          coverPage.drawText(successText, {
-            x: (coverWidth - successWidth) / 2,
-            y: coverHeight * 0.15,
-            size: successFontSize,
-            font: hebrewBoldFont,
-            color: rgb(0.3, 0.5, 0.7),
-          });
+          // Calculate widths for centering
+          let hebrewWidth = 0;
+          let symbolWidth = 0;
+          try {
+            hebrewWidth = hebrewBoldFont.widthOfTextAtSize(successHebrew, successFontSize);
+            symbolWidth = boldFont.widthOfTextAtSize("!", successFontSize);
+          } catch (e) {
+            hebrewWidth = successFontSize * successHebrew.length * 0.5;
+            symbolWidth = successFontSize * 0.3;
+          }
+          
+          const totalSuccessWidth = hebrewWidth + symbolWidth;
+          const successX = (coverWidth - totalSuccessWidth) / 2;
+          
+          // For RTL: draw "!" first (on left), then Hebrew text
+          drawHebrewText(coverPage, successHebrew, "!", successX, coverHeight * 0.15, successFontSize, true, rgb(0.3, 0.5, 0.7), true);
         } catch (hebrewError) {
           console.error("Error drawing Hebrew labels, falling back to English:", hebrewError);
           // Fall through to English labels
