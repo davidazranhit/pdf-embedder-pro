@@ -171,13 +171,132 @@ serve(async (req) => {
         console.warn("All Hebrew font sources failed - will skip Hebrew cover page elements");
       }
       
-      // Standard fonts for ASCII text and watermarks
+      // Standard fonts for ASCII text and watermarks (always available, supports Latin + numbers)
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
       
-      // Determine which fonts to use for cover page
-      const coverFont = fontsLoaded ? hebrewFont : font;
-      const coverBoldFont = fontsLoaded ? hebrewBoldFont : boldFont;
+      // Helper function to split text into Hebrew and non-Hebrew segments
+      const splitTextByScript = (text: string): Array<{text: string, isHebrew: boolean}> => {
+        const segments: Array<{text: string, isHebrew: boolean}> = [];
+        let currentSegment = '';
+        let currentIsHebrew = false;
+        let hasStarted = false;
+        
+        for (const char of text) {
+          const isHebrewChar = /[\u0590-\u05FF]/.test(char);
+          
+          if (!hasStarted) {
+            currentIsHebrew = isHebrewChar;
+            currentSegment = char;
+            hasStarted = true;
+          } else if (isHebrewChar === currentIsHebrew) {
+            currentSegment += char;
+          } else {
+            if (currentSegment) {
+              segments.push({ text: currentSegment, isHebrew: currentIsHebrew });
+            }
+            currentSegment = char;
+            currentIsHebrew = isHebrewChar;
+          }
+        }
+        
+        if (currentSegment) {
+          segments.push({ text: currentSegment, isHebrew: currentIsHebrew });
+        }
+        
+        return segments;
+      };
+      
+      // Helper function to draw mixed Hebrew/English text
+      const drawMixedText = (page: any, text: string, x: number, y: number, fontSize: number, useBold: boolean, color: any) => {
+        if (!fontsLoaded) {
+          // No Hebrew fonts, use standard font for everything
+          page.drawText(text, {
+            x, y,
+            size: fontSize,
+            font: useBold ? boldFont : font,
+            color,
+          });
+          return;
+        }
+        
+        const segments = splitTextByScript(text);
+        
+        // For RTL text with mixed content, we need to reverse the segment order and draw right-to-left
+        const hasHebrew = segments.some(s => s.isHebrew);
+        
+        if (hasHebrew) {
+          // Reverse segments for RTL rendering
+          const reversedSegments = [...segments].reverse();
+          let currentX = x;
+          
+          // First calculate total width
+          let totalWidth = 0;
+          for (const segment of segments) {
+            const segmentFont = segment.isHebrew ? (useBold ? hebrewBoldFont : hebrewFont) : (useBold ? boldFont : font);
+            try {
+              totalWidth += segmentFont.widthOfTextAtSize(segment.text, fontSize);
+            } catch (e) {
+              totalWidth += fontSize * segment.text.length * 0.6;
+            }
+          }
+          
+          // Draw from right side for RTL
+          currentX = x + totalWidth;
+          
+          for (const segment of reversedSegments) {
+            const segmentFont = segment.isHebrew ? (useBold ? hebrewBoldFont : hebrewFont) : (useBold ? boldFont : font);
+            let segmentWidth = fontSize * segment.text.length * 0.6;
+            
+            try {
+              segmentWidth = segmentFont.widthOfTextAtSize(segment.text, fontSize);
+            } catch (e) {}
+            
+            currentX -= segmentWidth;
+            
+            page.drawText(segment.text, {
+              x: currentX,
+              y,
+              size: fontSize,
+              font: segmentFont,
+              color,
+            });
+          }
+        } else {
+          // All Latin/numbers, draw normally
+          page.drawText(text, {
+            x, y,
+            size: fontSize,
+            font: useBold ? boldFont : font,
+            color,
+          });
+        }
+      };
+      
+      // Helper to calculate mixed text width
+      const getMixedTextWidth = (text: string, fontSize: number, useBold: boolean): number => {
+        if (!fontsLoaded) {
+          try {
+            return (useBold ? boldFont : font).widthOfTextAtSize(text, fontSize);
+          } catch (e) {
+            return fontSize * text.length * 0.6;
+          }
+        }
+        
+        const segments = splitTextByScript(text);
+        let totalWidth = 0;
+        
+        for (const segment of segments) {
+          const segmentFont = segment.isHebrew ? (useBold ? hebrewBoldFont : hebrewFont) : (useBold ? boldFont : font);
+          try {
+            totalWidth += segmentFont.widthOfTextAtSize(segment.text, fontSize);
+          } catch (e) {
+            totalWidth += fontSize * segment.text.length * 0.6;
+          }
+        }
+        
+        return totalWidth;
+      };
 
       // Add metadata watermark (hidden but traceable)
       pdfDoc.setTitle(`Protected Document - ${userId}`);
@@ -206,36 +325,26 @@ serve(async (req) => {
         color: rgb(0.97, 0.97, 0.98),
       });
 
-      // Title section - show file name
+      // Title section - show file name using mixed text support
       const titleText = fileNameWithoutExt;
       const titleFontSize = 28;
       
-      // Check if title contains Hebrew characters
-      const hasHebrewChars = /[\u0590-\u05FF]/.test(titleText);
+      // Calculate title width for centering
+      const titleWidth = getMixedTextWidth(titleText, titleFontSize, true);
       
-      // Only draw Hebrew text if fonts are loaded, otherwise show fallback
-      const canDrawTitle = fontsLoaded || !hasHebrewChars;
-      const titleFont = fontsLoaded ? coverBoldFont : boldFont;
-      const displayTitle = canDrawTitle ? titleText : "Document";
-      
-      let titleWidth = coverWidth * 0.6;
+      // Draw the title with mixed Hebrew/English/numbers support
       try {
-        titleWidth = titleFont.widthOfTextAtSize(displayTitle, titleFontSize);
-      } catch (e) {
-        console.log("Width calculation failed for title, using default");
-      }
-      
-      // Draw the title (only if we can render it properly)
-      try {
-        coverPage.drawText(displayTitle, {
-          x: (coverWidth - titleWidth) / 2,
-          y: coverHeight * 0.7,
-          size: titleFontSize,
-          font: titleFont,
-          color: rgb(0.2, 0.2, 0.3),
-        });
+        drawMixedText(
+          coverPage, 
+          titleText, 
+          (coverWidth - titleWidth) / 2, 
+          coverHeight * 0.7, 
+          titleFontSize, 
+          true, 
+          rgb(0.2, 0.2, 0.3)
+        );
       } catch (titleError) {
-        console.error("Error drawing title, using fallback:", titleError);
+        console.error("Error drawing title:", titleError);
         // Fallback to simple English text
         const fallbackTitle = "Document";
         const fallbackWidth = boldFont.widthOfTextAtSize(fallbackTitle, titleFontSize);
@@ -263,19 +372,20 @@ serve(async (req) => {
 
       if (fontsLoaded) {
         try {
-          // Hebrew labels (RTL layout)
+          // Hebrew labels (RTL layout) - use Hebrew font for Hebrew text
           coverPage.drawText("אימייל:", {
             x: coverWidth * 0.65,
             y: detailsY,
             size: detailsFontSize,
-            font: coverBoldFont,
+            font: hebrewBoldFont,
             color: rgb(0.3, 0.3, 0.4),
           });
+          // Use standard font for email (Latin characters)
           coverPage.drawText(email, {
             x: coverWidth * 0.15,
             y: detailsY,
             size: detailsFontSize,
-            font: coverFont,
+            font: font,
             color: rgb(0.4, 0.4, 0.5),
           });
 
@@ -283,14 +393,15 @@ serve(async (req) => {
             x: coverWidth * 0.58,
             y: detailsY - detailsLineHeight,
             size: detailsFontSize,
-            font: coverBoldFont,
+            font: hebrewBoldFont,
             color: rgb(0.3, 0.3, 0.4),
           });
+          // Use standard font for ID (numbers)
           coverPage.drawText(userId, {
             x: coverWidth * 0.35,
             y: detailsY - detailsLineHeight,
             size: detailsFontSize,
-            font: coverFont,
+            font: font,
             color: rgb(0.4, 0.4, 0.5),
           });
 
@@ -299,14 +410,14 @@ serve(async (req) => {
           const successFontSize = 24;
           let successWidth = coverWidth * 0.15;
           try {
-            successWidth = coverBoldFont.widthOfTextAtSize(successText, successFontSize);
+            successWidth = hebrewBoldFont.widthOfTextAtSize(successText, successFontSize);
           } catch (e) {}
           
           coverPage.drawText(successText, {
             x: (coverWidth - successWidth) / 2,
             y: coverHeight * 0.15,
             size: successFontSize,
-            font: coverBoldFont,
+            font: hebrewBoldFont,
             color: rgb(0.3, 0.5, 0.7),
           });
         } catch (hebrewError) {
