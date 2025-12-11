@@ -210,7 +210,8 @@ serve(async (req) => {
         return segments;
       };
       
-      // Draw mixed text (Hebrew + English/numbers/symbols)
+      // Draw mixed text (Hebrew + English/numbers/symbols) with proper RTL handling
+      // For RTL: Hebrew flows right-to-left, English appears to the LEFT of Hebrew
       const drawMixedText = (page: any, text: string, x: number, y: number, fontSize: number, useBold: boolean, color: any) => {
         if (!fontsLoaded) {
           // Fallback to standard font only
@@ -224,9 +225,28 @@ serve(async (req) => {
         }
         
         const segments = splitMixedText(text);
-        let currentX = x;
         
+        // Calculate widths for all segments
+        const segmentWidths: number[] = [];
         for (const segment of segments) {
+          const fontToUse = segment.isHebrew 
+            ? (useBold ? hebrewBoldFont : hebrewFont)
+            : (useBold ? boldFont : font);
+          try {
+            segmentWidths.push(fontToUse.widthOfTextAtSize(segment.text, fontSize));
+          } catch (e) {
+            segmentWidths.push(fontSize * segment.text.length * 0.5);
+          }
+        }
+        
+        // For RTL layout: draw from right to left
+        // x is the starting (rightmost) position for the text block
+        // We need to draw non-Hebrew segments to the left of Hebrew segments
+        
+        // Reverse the order - draw from end to start (right to left visually)
+        let currentX = x;
+        for (let i = segments.length - 1; i >= 0; i--) {
+          const segment = segments[i];
           const fontToUse = segment.isHebrew 
             ? (useBold ? hebrewBoldFont : hebrewFont)
             : (useBold ? boldFont : font);
@@ -240,11 +260,9 @@ serve(async (req) => {
               color,
             });
             
-            const segmentWidth = fontToUse.widthOfTextAtSize(segment.text, fontSize);
-            currentX += segmentWidth;
+            currentX += segmentWidths[i];
           } catch (e) {
             console.error("Error drawing segment:", segment.text, e);
-            // Try with standard font as fallback
             page.drawText(segment.text, {
               x: currentX,
               y,
