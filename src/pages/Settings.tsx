@@ -41,6 +41,9 @@ const Settings = () => {
   const [formTitle, setFormTitle] = useState<string>("בקשת קבצים");
   const [formInstructions, setFormInstructions] = useState<string>("הוראות למילוי:\n\nעליך להזין מייל ותעודת זהות וקורס מבוקש.\n\nלאחר שליחת הבקשה הפרטים יועברו לבדיקה ולאחר אישור (אין טעם לעדכן ששלחתם את הבקשה, היא תטופל בהקדם) יישלחו הקבצים המבוקשים ישירות למייל עם הפרטים האישיים מוטמעים על הקבצים למניעת שיתוף והפצה.");
   const [formWarning, setFormWarning] = useState<string>("כל ניסיון שיתוף או הפצת הקבצים מהווה הפרה חמורה של זכויות יוצרים ויטופל בהתאם");
+  const [coverEmailLabel, setCoverEmailLabel] = useState<string>("אימייל");
+  const [coverIdLabel, setCoverIdLabel] = useState<string>("תעודת זהות");
+  const [coverSuccessText, setCoverSuccessText] = useState<string>("בהצלחה!");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
@@ -74,6 +77,9 @@ const Settings = () => {
         setFormTitle(data.form_title ?? "בקשת קבצים");
         setFormInstructions(data.form_instructions ?? "הוראות למילוי:\n\nעליך להזין מייל ותעודת זהות וקורס מבוקש.\n\nלאחר שליחת הבקשה הפרטים יועברו לבדיקה ולאחר אישור (אין טעם לעדכן ששלחתם את הבקשה, היא תטופל בהקדם) יישלחו הקבצים המבוקשים ישירות למייל עם הפרטים האישיים מוטמעים על הקבצים למניעת שיתוף והפצה.");
         setFormWarning(data.form_warning ?? "כל ניסיון שיתוף או הפצת הקבצים מהווה הפרה חמורה של זכויות יוצרים ויטופל בהתאם");
+        setCoverEmailLabel(data.cover_email_label ?? "אימייל");
+        setCoverIdLabel(data.cover_id_label ?? "תעודת זהות");
+        setCoverSuccessText(data.cover_success_text ?? "בהצלחה!");
       }
     } catch (error) {
       console.error("Error loading settings:", error);
@@ -123,6 +129,9 @@ const Settings = () => {
           form_title: formTitle,
           form_instructions: formInstructions,
           form_warning: formWarning,
+          cover_email_label: coverEmailLabel,
+          cover_id_label: coverIdLabel,
+          cover_success_text: coverSuccessText,
         })
         .eq("id", "00000000-0000-0000-0000-000000000001");
 
@@ -445,6 +454,52 @@ const Settings = () => {
                   </div>
                 </div>
 
+                {/* Cover Page Section */}
+                <div className="pt-6 border-t border-border">
+                  <h3 className="text-xl font-semibold mb-4 text-foreground">
+                    דף כריכה
+                  </h3>
+                  
+                  {/* Email Label */}
+                  <div className="space-y-3 mb-6">
+                    <Label className="text-base font-medium">
+                      תווית אימייל
+                    </Label>
+                    <Input
+                      value={coverEmailLabel}
+                      onChange={(e) => setCoverEmailLabel(e.target.value)}
+                      className="w-full"
+                      placeholder='אימייל'
+                    />
+                  </div>
+
+                  {/* ID Label */}
+                  <div className="space-y-3 mb-6">
+                    <Label className="text-base font-medium">
+                      תווית תעודת זהות
+                    </Label>
+                    <Input
+                      value={coverIdLabel}
+                      onChange={(e) => setCoverIdLabel(e.target.value)}
+                      className="w-full"
+                      placeholder='תעודת זהות'
+                    />
+                  </div>
+
+                  {/* Success Text */}
+                  <div className="space-y-3 mb-6">
+                    <Label className="text-base font-medium">
+                      טקסט סיום (למשל: בהצלחה!)
+                    </Label>
+                    <Input
+                      value={coverSuccessText}
+                      onChange={(e) => setCoverSuccessText(e.target.value)}
+                      className="w-full"
+                      placeholder='בהצלחה!'
+                    />
+                  </div>
+                </div>
+
                 {/* Save Button */}
                 <Button
                   onClick={saveSettings}
@@ -491,7 +546,7 @@ const Settings = () => {
                         className="font-bold text-sm md:text-base"
                         style={{ color: 'rgb(77, 77, 102)' }}
                       >
-                        אימייל:
+                        {coverEmailLabel}:
                       </span>
                       <span 
                         className="mr-2 text-sm md:text-base"
@@ -505,7 +560,7 @@ const Settings = () => {
                         className="font-bold text-sm md:text-base"
                         style={{ color: 'rgb(77, 77, 102)' }}
                       >
-                        תעודת זהות:
+                        {coverIdLabel}:
                       </span>
                       <span 
                         className="mr-2 text-sm md:text-base"
@@ -522,7 +577,7 @@ const Settings = () => {
                       className="text-lg md:text-xl font-bold"
                       style={{ color: 'rgb(77, 128, 179)' }}
                     >
-                      בהצלחה!
+                      {coverSuccessText}
                     </span>
                   </div>
 

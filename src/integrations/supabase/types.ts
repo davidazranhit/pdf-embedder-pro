@@ -125,6 +125,9 @@ export type Database = {
       watermark_settings: {
         Row: {
           center_rotation: number
+          cover_email_label: string
+          cover_id_label: string
+          cover_success_text: string
           created_at: string | null
           email_body: string | null
           email_subject: string | null
@@ -145,6 +148,9 @@ export type Database = {
         }
         Insert: {
           center_rotation?: number
+          cover_email_label?: string
+          cover_id_label?: string
+          cover_success_text?: string
           created_at?: string | null
           email_body?: string | null
           email_subject?: string | null
@@ -165,6 +171,9 @@ export type Database = {
         }
         Update: {
           center_rotation?: number
+          cover_email_label?: string
+          cover_id_label?: string
+          cover_success_text?: string
           created_at?: string | null
           email_body?: string | null
           email_subject?: string | null
