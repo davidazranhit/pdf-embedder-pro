@@ -79,7 +79,10 @@ serve(async (req) => {
       hidden_watermark_font_size: 24,
       hidden_watermark_opacity: 0.12,
       hidden_watermark_row_spacing: 15,
-      hidden_watermark_col_spacing: 10
+      hidden_watermark_col_spacing: 10,
+      cover_email_label: "אימייל",
+      cover_id_label: "תעודת זהות",
+      cover_success_text: "בהצלחה!"
     };
 
     // Helper to process a single file path and return processedId
@@ -345,10 +348,10 @@ serve(async (req) => {
         });
       };
       
-      // Helper to draw "בהצלחה!" with symbol on the left (RTL)
-      const drawSuccessText = (page: any, x: number, y: number, fontSize: number, color: any) => {
+      // Helper to draw success text with proper RTL handling
+      const drawSuccessText = (page: any, x: number, y: number, fontSize: number, color: any, successText: string) => {
         if (!fontsLoaded) {
-          page.drawText("Good Luck!", {
+          page.drawText(successText || "Good Luck!", {
             x, y,
             size: fontSize,
             font: boldFont,
@@ -357,57 +360,21 @@ serve(async (req) => {
           return;
         }
         
-        const hebrewText = "בהצלחה";
-        const symbol = "!";
-        
-        // For RTL: symbol appears visually on the left
-        // Draw symbol first
-        page.drawText(symbol, {
-          x,
-          y,
-          size: fontSize,
-          font: boldFont,
-          color,
-        });
-        
-        // Then draw Hebrew text after the symbol
-        let symbolWidth = 0;
-        try {
-          symbolWidth = boldFont.widthOfTextAtSize(symbol, fontSize);
-        } catch (e) {
-          symbolWidth = fontSize * 0.3;
-        }
-        
-        page.drawText(hebrewText, {
-          x: x + symbolWidth,
-          y,
-          size: fontSize,
-          font: hebrewBoldFont,
-          color,
-        });
+        // Use drawMixedText for proper RTL handling of success text
+        drawMixedText(page, successText, x, y, fontSize, true, color);
       };
       
       // Get success text width
-      const getSuccessTextWidth = (fontSize: number): number => {
+      const getSuccessTextWidth = (fontSize: number, successText: string): number => {
         if (!fontsLoaded) {
           try {
-            return boldFont.widthOfTextAtSize("Good Luck!", fontSize);
+            return boldFont.widthOfTextAtSize(successText, fontSize);
           } catch (e) {
-            return fontSize * 10 * 0.5;
+            return fontSize * successText.length * 0.5;
           }
         }
         
-        let hebrewWidth = 0;
-        let symbolWidth = 0;
-        try {
-          hebrewWidth = hebrewBoldFont.widthOfTextAtSize("בהצלחה", fontSize);
-          symbolWidth = boldFont.widthOfTextAtSize("!", fontSize);
-        } catch (e) {
-          hebrewWidth = fontSize * 6 * 0.5;
-          symbolWidth = fontSize * 0.3;
-        }
-        
-        return hebrewWidth + symbolWidth;
+        return getMixedTextWidth(successText, fontSize, true);
       };
 
       // Add metadata watermark (hidden but traceable)
@@ -483,10 +450,14 @@ serve(async (req) => {
 
       if (fontsLoaded) {
         try {
-          // Draw "אימייל:" with Hebrew font for text, standard font for ":"
-          const emailLabelHebrew = "אימייל";
+          // Get dynamic labels from config
+          const emailLabelText = watermarkConfig.cover_email_label || "אימייל";
+          const idLabelText = watermarkConfig.cover_id_label || "תעודת זהות";
+          const successText = watermarkConfig.cover_success_text || "בהצלחה!";
+          
+          // Draw email label with Hebrew font for text, standard font for ":"
           const emailLabelX = coverWidth * 0.65;
-          drawHebrewLabel(coverPage, emailLabelHebrew, ":", emailLabelX, detailsY, detailsFontSize, true, rgb(0.3, 0.3, 0.4));
+          drawHebrewLabel(coverPage, emailLabelText, ":", emailLabelX, detailsY, detailsFontSize, true, rgb(0.3, 0.3, 0.4));
           
           // Use standard font for email (Latin characters)
           coverPage.drawText(email, {
@@ -497,10 +468,9 @@ serve(async (req) => {
             color: rgb(0.4, 0.4, 0.5),
           });
 
-          // Draw "תעודת זהות:" with Hebrew font for text, standard font for ":"
-          const idLabelHebrew = "תעודת זהות";
+          // Draw ID label with Hebrew font for text, standard font for ":"
           const idLabelX = coverWidth * 0.55;
-          drawHebrewLabel(coverPage, idLabelHebrew, ":", idLabelX, detailsY - detailsLineHeight, detailsFontSize, true, rgb(0.3, 0.3, 0.4));
+          drawHebrewLabel(coverPage, idLabelText, ":", idLabelX, detailsY - detailsLineHeight, detailsFontSize, true, rgb(0.3, 0.3, 0.4));
           
           // Use standard font for ID (numbers)
           coverPage.drawText(userId, {
@@ -511,11 +481,11 @@ serve(async (req) => {
             color: rgb(0.4, 0.4, 0.5),
           });
 
-          // Draw "בהצלחה!" 
+          // Draw success text 
           const successFontSize = 24;
-          const successWidth = getSuccessTextWidth(successFontSize);
+          const successWidth = getSuccessTextWidth(successFontSize, successText);
           const successX = (coverWidth - successWidth) / 2;
-          drawSuccessText(coverPage, successX, coverHeight * 0.15, successFontSize, rgb(0.3, 0.5, 0.7));
+          drawSuccessText(coverPage, successX, coverHeight * 0.15, successFontSize, rgb(0.3, 0.5, 0.7), successText);
         } catch (hebrewError) {
           console.error("Error drawing Hebrew labels, falling back to English:", hebrewError);
           // Fall through to English labels
