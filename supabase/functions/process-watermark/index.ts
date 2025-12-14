@@ -307,13 +307,51 @@ serve(async (req) => {
         return totalWidth;
       };
       
-      // Simple helper to draw Hebrew label with symbol (e.g., "אימייל:")
-      const drawHebrewLabel = (page: any, hebrewText: string, symbol: string, x: number, y: number, fontSize: number, useBold: boolean, color: any) => {
+      // Helper to get Hebrew label width (colon comes BEFORE Hebrew text in RTL visual order)
+      const getHebrewLabelWidth = (hebrewText: string, symbol: string, fontSize: number, useBold: boolean): number => {
         if (!fontsLoaded) {
-          page.drawText(hebrewText + symbol, {
-            x, y,
+          const fontToUse = useBold ? boldFont : font;
+          try {
+            return fontToUse.widthOfTextAtSize(symbol + hebrewText, fontSize);
+          } catch (e) {
+            return fontSize * (symbol.length + hebrewText.length) * 0.5;
+          }
+        }
+        
+        const hebrewFontToUse = useBold ? hebrewBoldFont : hebrewFont;
+        const symbolFontToUse = useBold ? boldFont : font;
+        
+        let hebrewWidth = 0;
+        let symbolWidth = 0;
+        try {
+          hebrewWidth = hebrewFontToUse.widthOfTextAtSize(hebrewText, fontSize);
+          symbolWidth = symbolFontToUse.widthOfTextAtSize(symbol, fontSize);
+        } catch (e) {
+          hebrewWidth = fontSize * hebrewText.length * 0.5;
+          symbolWidth = fontSize * symbol.length * 0.3;
+        }
+        
+        return hebrewWidth + symbolWidth;
+      };
+      
+      // Draw Hebrew label with symbol for RTL (e.g., ":אימייל" visually)
+      // x is the RIGHT edge position (RTL alignment)
+      // Draws: [colon][Hebrew text] from left to right, but positioned so right edge is at x
+      const drawHebrewLabelRTL = (page: any, hebrewText: string, symbol: string, rightX: number, y: number, fontSize: number, useBold: boolean, color: any) => {
+        if (!fontsLoaded) {
+          const fullText = symbol + hebrewText;
+          const fontToUse = useBold ? boldFont : font;
+          let textWidth = 0;
+          try {
+            textWidth = fontToUse.widthOfTextAtSize(fullText, fontSize);
+          } catch (e) {
+            textWidth = fontSize * fullText.length * 0.5;
+          }
+          page.drawText(fullText, {
+            x: rightX - textWidth,
+            y,
             size: fontSize,
-            font: useBold ? boldFont : font,
+            font: fontToUse,
             color,
           });
           return;
@@ -322,28 +360,35 @@ serve(async (req) => {
         const hebrewFontToUse = useBold ? hebrewBoldFont : hebrewFont;
         const symbolFontToUse = useBold ? boldFont : font;
         
-        // Draw Hebrew text
-        page.drawText(hebrewText, {
-          x,
-          y,
-          size: fontSize,
-          font: hebrewFontToUse,
-          color,
-        });
-        
-        // Draw symbol with standard font
+        // Calculate widths
         let hebrewWidth = 0;
+        let symbolWidth = 0;
         try {
           hebrewWidth = hebrewFontToUse.widthOfTextAtSize(hebrewText, fontSize);
+          symbolWidth = symbolFontToUse.widthOfTextAtSize(symbol, fontSize);
         } catch (e) {
           hebrewWidth = fontSize * hebrewText.length * 0.5;
+          symbolWidth = fontSize * symbol.length * 0.3;
         }
         
+        const totalWidth = hebrewWidth + symbolWidth;
+        const startX = rightX - totalWidth;
+        
+        // Draw colon first (leftmost position)
         page.drawText(symbol, {
-          x: x + hebrewWidth,
+          x: startX,
           y,
           size: fontSize,
           font: symbolFontToUse,
+          color,
+        });
+        
+        // Draw Hebrew text after colon
+        page.drawText(hebrewText, {
+          x: startX + symbolWidth,
+          y,
+          size: fontSize,
+          font: hebrewFontToUse,
           color,
         });
       };
@@ -455,26 +500,35 @@ serve(async (req) => {
           const idLabelText = watermarkConfig.cover_id_label || "תעודת זהות";
           const successText = watermarkConfig.cover_success_text || "בהצלחה!";
           
-          // Draw email label with Hebrew font for text, standard font for ":"
-          const emailLabelX = coverWidth * 0.65;
-          drawHebrewLabel(coverPage, emailLabelText, ":", emailLabelX, detailsY, detailsFontSize, true, rgb(0.3, 0.3, 0.4));
+          // RTL layout: labels on the right, values on the left
+          const rightEdge = coverWidth * 0.85;
           
-          // Use standard font for email (Latin characters)
+          // Calculate email label width for proper positioning of value
+          const emailLabelWidth = getHebrewLabelWidth(emailLabelText, ":", detailsFontSize, true);
+          
+          // Draw email label (RTL - aligned to right edge)
+          drawHebrewLabelRTL(coverPage, emailLabelText, ":", rightEdge, detailsY, detailsFontSize, true, rgb(0.3, 0.3, 0.4));
+          
+          // Draw email value to the left of the label
+          const emailWidth = font.widthOfTextAtSize(email, detailsFontSize);
           coverPage.drawText(email, {
-            x: coverWidth * 0.15,
+            x: rightEdge - emailLabelWidth - 15 - emailWidth,
             y: detailsY,
             size: detailsFontSize,
             font: font,
             color: rgb(0.4, 0.4, 0.5),
           });
 
-          // Draw ID label with Hebrew font for text, standard font for ":"
-          const idLabelX = coverWidth * 0.55;
-          drawHebrewLabel(coverPage, idLabelText, ":", idLabelX, detailsY - detailsLineHeight, detailsFontSize, true, rgb(0.3, 0.3, 0.4));
+          // Calculate ID label width
+          const idLabelWidth = getHebrewLabelWidth(idLabelText, ":", detailsFontSize, true);
           
-          // Use standard font for ID (numbers)
+          // Draw ID label (RTL - aligned to right edge)
+          drawHebrewLabelRTL(coverPage, idLabelText, ":", rightEdge, detailsY - detailsLineHeight, detailsFontSize, true, rgb(0.3, 0.3, 0.4));
+          
+          // Draw ID value to the left of the label
+          const idWidth = font.widthOfTextAtSize(userId, detailsFontSize);
           coverPage.drawText(userId, {
-            x: coverWidth * 0.35,
+            x: rightEdge - idLabelWidth - 15 - idWidth,
             y: detailsY - detailsLineHeight,
             size: detailsFontSize,
             font: font,
