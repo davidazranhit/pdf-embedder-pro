@@ -91,24 +91,12 @@ serve(async (req) => {
           }
         }
 
-        // Create a signed URL valid for 3 days
+        // Create download URL using our one-time download function
         const actualFileId = typeof fileId === 'string' ? fileId : '';
-        const { data: signed, error: signedError } = await supabase.storage
-          .from('pdf-files')
-          .createSignedUrl(actualFileId, 60 * 60 * 24 * 3);
-        if (signedError || !signed?.signedUrl) {
-          console.error('Error creating signed URL for', fileId, signedError);
-          continue;
-        }
+        const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+        const downloadUrl = `${supabaseUrl}/functions/v1/download-file?path=${encodeURIComponent(actualFileId)}&name=${encodeURIComponent(finalFileName)}`;
 
-        // Ensure the URL is absolute and force download filename
-        const baseUrl = signed.signedUrl.startsWith('http') 
-          ? signed.signedUrl 
-          : `${Deno.env.get("SUPABASE_URL")}/storage/v1${signed.signedUrl}`;
-        const delimiter = baseUrl.includes('?') ? '&' : '?';
-        const finalUrl = `${baseUrl}${delimiter}download=${encodeURIComponent(finalFileName)}`;
-
-        links.push({ name: finalFileName, url: finalUrl });
+        links.push({ name: finalFileName, url: downloadUrl });
       } catch (err) {
         console.error('Error preparing link for', fileItem, err);
       }
@@ -148,7 +136,8 @@ serve(async (req) => {
         htmlContent: `
           <div dir="rtl" style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px;">
             ${emailBodyHtml}
-            <p style="margin-bottom: 12px; margin-top: 20px;"><strong>קבצים להורדה (זמינים ל-3 ימים):</strong></p>
+            <p style="margin-bottom: 12px; margin-top: 20px;"><strong>קבצים להורדה (הורדה חד-פעמית בלבד!):</strong></p>
+            <p style="color: #d32f2f; font-size: 14px; margin-bottom: 12px;">שים לב: כל קובץ ניתן להורדה פעם אחת בלבד. לאחר ההורדה הקובץ לא יהיה זמין יותר.</p>
             <div style="margin-right: 20px;">
               ${listItems}
             </div>
