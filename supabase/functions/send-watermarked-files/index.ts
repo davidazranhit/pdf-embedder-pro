@@ -136,8 +136,7 @@ serve(async (req) => {
         htmlContent: `
           <div dir="rtl" style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px;">
             ${emailBodyHtml}
-            <p style="margin-bottom: 12px; margin-top: 20px;"><strong>קבצים להורדה (הורדה חד-פעמית בלבד!):</strong></p>
-            <p style="color: #d32f2f; font-size: 14px; margin-bottom: 12px;">שים לב: כל קובץ ניתן להורדה פעם אחת בלבד. לאחר ההורדה הקובץ לא יהיה זמין יותר.</p>
+            <p style="margin-bottom: 12px; margin-top: 20px;"><strong>קבצים להורדה:</strong></p>
             <div style="margin-right: 20px;">
               ${listItems}
             </div>
