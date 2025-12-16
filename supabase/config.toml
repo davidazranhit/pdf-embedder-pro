@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.cleanup-old-files]
 verify_jwt = false
+
+[functions.download-file]
+verify_jwt = false
