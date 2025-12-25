@@ -3,16 +3,32 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { validateIsraeliID } from "@/lib/idValidation";
 import { FileText, Send } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+interface Course {
+  id: string;
+  name: string;
+}
 
 const FileRequest = () => {
   const [email, setEmail] = useState("");
   const [idNumber, setIdNumber] = useState("");
   const [courseName, setCourseName] = useState("");
+  const [notes, setNotes] = useState("");
+  const [courses, setCourses] = useState<Course[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingCourses, setIsLoadingCourses] = useState(true);
   const [formTitle, setFormTitle] = useState("בקשת קבצים");
   const [formInstructions, setFormInstructions] = useState("הוראות למילוי:\n\nעליך להזין מייל ותעודת זהות וקורס מבוקש.\n\nלאחר שליחת הבקשה הפרטים יועברו לבדיקה ולאחר אישור (אין טעם לעדכן ששלחתם את הבקשה, היא תטופל בהקדם) יישלחו הקבצים המבוקשים ישירות למייל עם הפרטים האישיים מוטמעים על הקבצים למניעת שיתוף והפצה.");
   const [formWarning, setFormWarning] = useState("כל ניסיון שיתוף או הפצת הקבצים מהווה הפרה חמורה של זכויות יוצרים ויטופל בהתאם");
@@ -20,6 +36,7 @@ const FileRequest = () => {
 
   useEffect(() => {
     loadFormTexts();
+    loadCourses();
   }, []);
 
   const loadFormTexts = async () => {
@@ -34,11 +51,28 @@ const FileRequest = () => {
 
       if (data) {
         setFormTitle(data.form_title ?? "בקשת קבצים");
-        setFormInstructions(data.form_instructions ?? "הוראות למילוי:\n\nעליך להזין מייל ותעודת זהות וקורס מבוקש.\n\nלאחר שליחת הבקשה הפרטים יועברו לבדיקה ולאחר אישור (אין טעם לעדכן ששלחתם את הבקשה, היא תטופל בהקדם) יישלחו הקבצים המבוקשים ישירות למייל עם הפרטים האישיים מוטמעים על הקבצים למניעת שיתוף והפצה.");
+        setFormInstructions(data.form_instructions ?? "הוראות למילוי:\n\nעליך להזין מייל ותעודת זהות וקורס מבוקש.\n\nלאחר שליחת הבקשה הפרטים יועברו לבדיקה ולאחר אישור (אין טעות לעדכן ששלחתם את הבקשה, היא תטופל בהקדם) יישלחו הקבצים המבוקשים ישירות למייל עם הפרטים האישיים מוטמעים על הקבצים למניעת שיתוף והפצה.");
         setFormWarning(data.form_warning ?? "כל ניסיון שיתוף או הפצת הקבצים מהווה הפרה חמורה של זכויות יוצרים ויטופל בהתאם");
       }
     } catch (error) {
       console.error("Error loading form texts:", error);
+    }
+  };
+
+  const loadCourses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("courses")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+      setCourses(data || []);
+    } catch (error) {
+      console.error("Error loading courses:", error);
+    } finally {
+      setIsLoadingCourses(false);
     }
   };
 
@@ -48,7 +82,7 @@ const FileRequest = () => {
     if (!email || !idNumber || !courseName) {
       toast({
         title: "שגיאה",
-        description: "אנא מלא את כל השדות",
+        description: "אנא מלא את כל השדות הנדרשים",
         variant: "destructive",
       });
       return;
@@ -71,6 +105,7 @@ const FileRequest = () => {
         email,
         id_number: idNumber,
         course_name: courseName,
+        notes: notes.trim() || null,
       });
 
       if (error) throw error;
@@ -84,6 +119,7 @@ const FileRequest = () => {
       setEmail("");
       setIdNumber("");
       setCourseName("");
+      setNotes("");
     } catch (error) {
       console.error("Error submitting request:", error);
       toast({
@@ -144,15 +180,45 @@ const FileRequest = () => {
 
           <div className="space-y-2">
             <Label htmlFor="courseName">קורס מבוקש</Label>
-            <Input
-              id="courseName"
-              type="text"
-              placeholder="שם הקורס"
-              value={courseName}
-              onChange={(e) => setCourseName(e.target.value)}
-              required
+            {isLoadingCourses ? (
+              <div className="h-10 bg-muted animate-pulse rounded-md" />
+            ) : courses.length > 0 ? (
+              <Select value={courseName} onValueChange={setCourseName}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="בחר קורס..." />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  {courses.map((course) => (
+                    <SelectItem key={course.id} value={course.name}>
+                      {course.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                id="courseName"
+                type="text"
+                placeholder="שם הקורס"
+                value={courseName}
+                onChange={(e) => setCourseName(e.target.value)}
+                required
+                dir="rtl"
+                className="text-right"
+              />
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="notes">הערות (לא חובה)</Label>
+            <Textarea
+              id="notes"
+              placeholder="הערות נוספות..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
               dir="rtl"
-              className="text-right"
+              className="text-right resize-none"
+              rows={3}
             />
           </div>
 

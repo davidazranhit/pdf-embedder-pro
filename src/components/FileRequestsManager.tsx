@@ -49,6 +49,7 @@ interface FileRequest {
   email: string;
   id_number: string;
   course_name: string;
+  notes: string | null;
   submission_date: string;
   status: "pending" | "sent";
   sent_date: string | null;
@@ -576,6 +577,7 @@ export const FileRequestsManager = () => {
                     <TableHead className="text-right">מייל</TableHead>
                     <TableHead className="text-right">תעודת זהות</TableHead>
                     <TableHead className="text-right">קורס מבוקש</TableHead>
+                    <TableHead className="text-right">הערות</TableHead>
                     <TableHead className="text-right">תאריך בקשה</TableHead>
                     <TableHead className="text-right">סטטוס</TableHead>
                     <TableHead className="text-right">פעולות</TableHead>
@@ -624,6 +626,24 @@ export const FileRequestsManager = () => {
                         </button>
                       </TableCell>
                       <TableCell>{request.course_name}</TableCell>
+                      <TableCell className="max-w-[150px]">
+                        {request.notes ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="text-sm text-muted-foreground truncate block cursor-help">
+                                  {request.notes.length > 30 ? `${request.notes.substring(0, 30)}...` : request.notes}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-[300px]">
+                                <p className="whitespace-pre-wrap">{request.notes}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          <span className="text-muted-foreground/50">-</span>
+                        )}
+                      </TableCell>
                       <TableCell>{formatDate(request.submission_date)}</TableCell>
                       <TableCell>
                         <Badge

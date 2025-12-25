@@ -7,10 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { LogoutButton } from "@/components/LogoutButton";
-import { ArrowRight, Settings as SettingsIcon } from "lucide-react";
+import { ArrowRight, Settings as SettingsIcon, BookOpen } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { CourseManager } from "@/components/CourseManager";
 
 interface WatermarkPosition {
   type: "top-right" | "top-left" | "bottom-right" | "bottom-left" | "center";
@@ -498,6 +499,18 @@ const Settings = () => {
                       placeholder='בהצלחה!'
                     />
                   </div>
+                </div>
+
+                {/* Courses Management Section */}
+                <div className="pt-6 border-t border-border">
+                  <h3 className="text-xl font-semibold mb-4 text-foreground flex items-center gap-2">
+                    <BookOpen className="w-5 h-5" />
+                    ניהול קורסים
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    הקורסים שתגדיר כאן יופיעו בתפריט הבחירה בטופס בקשת הקבצים
+                  </p>
+                  <CourseManager />
                 </div>
 
                 {/* Save Button */}
