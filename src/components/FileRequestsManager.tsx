@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,7 +13,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Send, Filter, FileStack, Calendar as CalendarIcon, X } from "lucide-react";
+import { FileText, Send, Filter, FileStack, Calendar as CalendarIcon, X, Users, ArrowLeft } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useNavigate } from "react-router-dom";
 import {
   Dialog,
@@ -76,8 +82,42 @@ export const FileRequestsManager = () => {
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [quickFilter, setQuickFilter] = useState<string>("all");
+  const [userFilter, setUserFilter] = useState<{ type: 'email' | 'id_number'; value: string } | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Calculate request counts per user (by email and id_number)
+  const userRequestCounts = useMemo(() => {
+    const emailCounts = new Map<string, number>();
+    const idCounts = new Map<string, number>();
+    
+    requests.forEach((r) => {
+      emailCounts.set(r.email, (emailCounts.get(r.email) || 0) + 1);
+      idCounts.set(r.id_number, (idCounts.get(r.id_number) || 0) + 1);
+    });
+    
+    return { emailCounts, idCounts };
+  }, [requests]);
+
+  const isRepeatUser = (request: FileRequest) => {
+    const emailCount = userRequestCounts.emailCounts.get(request.email) || 0;
+    const idCount = userRequestCounts.idCounts.get(request.id_number) || 0;
+    return emailCount > 1 || idCount > 1;
+  };
+
+  const getRepeatCount = (request: FileRequest) => {
+    const emailCount = userRequestCounts.emailCounts.get(request.email) || 0;
+    const idCount = userRequestCounts.idCounts.get(request.id_number) || 0;
+    return Math.max(emailCount, idCount);
+  };
+
+  const handleFilterByUser = (request: FileRequest, type: 'email' | 'id_number') => {
+    setUserFilter({ type, value: type === 'email' ? request.email : request.id_number });
+  };
+
+  const clearUserFilter = () => {
+    setUserFilter(null);
+  };
 
   useEffect(() => {
     fetchRequests();
@@ -86,6 +126,15 @@ export const FileRequestsManager = () => {
 
   useEffect(() => {
     let base = statusFilter === "all" ? requests : requests.filter((r) => r.status === statusFilter);
+    
+    // User filter (by email or id_number)
+    if (userFilter) {
+      base = base.filter((r) => 
+        userFilter.type === 'email' 
+          ? r.email === userFilter.value 
+          : r.id_number === userFilter.value
+      );
+    }
     
     // Search filter
     const q = search.trim().toLowerCase();
@@ -106,7 +155,7 @@ export const FileRequestsManager = () => {
     }
     
     setFilteredRequests(base);
-  }, [statusFilter, requests, search, startDate, endDate]);
+  }, [statusFilter, requests, search, startDate, endDate, userFilter]);
 
   const fetchRequests = async () => {
     setIsLoading(true);
@@ -387,7 +436,25 @@ export const FileRequestsManager = () => {
       <Card className="p-6">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-xl font-semibold text-foreground">בקשות לקבצים</h3>
+              <div className="flex items-center gap-3">
+                <h3 className="text-xl font-semibold text-foreground">בקשות לקבצים</h3>
+                {userFilter && (
+                  <div className="flex items-center gap-2 bg-primary/10 text-primary px-3 py-1.5 rounded-full">
+                    <Users className="w-4 h-4" />
+                    <span className="text-sm font-medium">
+                      מציג בקשות של: {userFilter.value}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearUserFilter}
+                      className="h-5 w-5 p-0 hover:bg-primary/20"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 <Input
                   value={search}
@@ -516,9 +583,46 @@ export const FileRequestsManager = () => {
                 </TableHeader>
                 <TableBody>
                   {filteredRequests.map((request) => (
-                    <TableRow key={request.id}>
-                      <TableCell className="font-medium">{request.email}</TableCell>
-                      <TableCell>{request.id_number}</TableCell>
+                    <TableRow key={request.id} className={isRepeatUser(request) ? "bg-amber-50 dark:bg-amber-950/20" : ""}>
+                      <TableCell className="font-medium">
+                        <TooltipProvider>
+                          <div className="flex items-center gap-2">
+                            {isRepeatUser(request) && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/50 dark:hover:bg-amber-800/50 rounded-full"
+                                    onClick={() => handleFilterByUser(request, 'email')}
+                                  >
+                                    <span className="text-xs font-bold text-amber-700 dark:text-amber-300">
+                                      {getRepeatCount(request)}
+                                    </span>
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>משתמש חוזר - לחץ לצפייה בכל הבקשות</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                            <button
+                              onClick={() => handleFilterByUser(request, 'email')}
+                              className="hover:underline hover:text-primary transition-colors text-right"
+                            >
+                              {request.email}
+                            </button>
+                          </div>
+                        </TooltipProvider>
+                      </TableCell>
+                      <TableCell>
+                        <button
+                          onClick={() => handleFilterByUser(request, 'id_number')}
+                          className="hover:underline hover:text-primary transition-colors"
+                        >
+                          {request.id_number}
+                        </button>
+                      </TableCell>
                       <TableCell>{request.course_name}</TableCell>
                       <TableCell>{formatDate(request.submission_date)}</TableCell>
                       <TableCell>
