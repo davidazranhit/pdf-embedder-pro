@@ -184,12 +184,12 @@ const FileRequest = () => {
               <div className="h-10 bg-muted animate-pulse rounded-md" />
             ) : courses.length > 0 ? (
               <Select dir="rtl" value={courseName} onValueChange={setCourseName}>
-                <SelectTrigger className="w-full flex-row-reverse">
-                  <SelectValue placeholder="בחר קורס" />
+                <SelectTrigger className="w-full text-right [&>span]:text-right">
+                  <SelectValue placeholder="בחר קורס" className="text-right" />
                 </SelectTrigger>
                 <SelectContent className="bg-background border shadow-lg z-50" dir="rtl">
                   {courses.map((course) => (
-                    <SelectItem key={course.id} value={course.name} className="text-right">
+                    <SelectItem key={course.id} value={course.name} className="text-right justify-end">
                       {course.name}
                     </SelectItem>
                   ))}
