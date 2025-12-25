@@ -67,6 +67,10 @@ interface Category {
   count: number;
 }
 
+interface Course {
+  id: string;
+  name: string;
+}
 
 export const FileRequestsManager = () => {
   const [requests, setRequests] = useState<FileRequest[]>([]);
@@ -84,6 +88,8 @@ export const FileRequestsManager = () => {
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [quickFilter, setQuickFilter] = useState<string>("all");
   const [userFilter, setUserFilter] = useState<{ type: 'email' | 'id_number'; value: string } | null>(null);
+  const [courseFilter, setCourseFilter] = useState<string>("all");
+  const [courses, setCourses] = useState<Course[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -123,7 +129,21 @@ export const FileRequestsManager = () => {
   useEffect(() => {
     fetchRequests();
     fetchTemplates();
+    fetchCourses();
   }, []);
+
+  const fetchCourses = async () => {
+    const { data, error } = await supabase
+      .from("courses")
+      .select("id, name")
+      .order("name", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching courses:", error);
+    } else {
+      setCourses(data || []);
+    }
+  };
 
   useEffect(() => {
     let base = statusFilter === "all" ? requests : requests.filter((r) => r.status === statusFilter);
@@ -135,6 +155,11 @@ export const FileRequestsManager = () => {
           ? r.email === userFilter.value 
           : r.id_number === userFilter.value
       );
+    }
+    
+    // Course filter
+    if (courseFilter !== "all") {
+      base = base.filter((r) => r.course_name === courseFilter);
     }
     
     // Search filter
@@ -156,7 +181,7 @@ export const FileRequestsManager = () => {
     }
     
     setFilteredRequests(base);
-  }, [statusFilter, requests, search, startDate, endDate, userFilter]);
+  }, [statusFilter, requests, search, startDate, endDate, userFilter, courseFilter]);
 
   const fetchRequests = async () => {
     setIsLoading(true);
@@ -439,6 +464,11 @@ export const FileRequestsManager = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <h3 className="text-xl font-semibold text-foreground">בקשות לקבצים</h3>
+                <Badge variant="outline" className="text-sm">
+                  {filteredRequests.length === requests.length 
+                    ? `${requests.length} בקשות` 
+                    : `${filteredRequests.length} מתוך ${requests.length}`}
+                </Badge>
                 {userFilter && (
                   <div className="flex items-center gap-2 bg-primary/10 text-primary px-3 py-1.5 rounded-full">
                     <Users className="w-4 h-4" />
@@ -465,11 +495,21 @@ export const FileRequestsManager = () => {
                 />
                 <Filter className="w-4 h-4 text-muted-foreground" />
                 <select
+                  value={courseFilter}
+                  onChange={(e) => setCourseFilter(e.target.value)}
+                  className="px-3 py-1.5 border rounded-lg bg-background text-sm"
+                >
+                  <option value="all">כל הקורסים</option>
+                  {courses.map((course) => (
+                    <option key={course.id} value={course.name}>{course.name}</option>
+                  ))}
+                </select>
+                <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value as any)}
                   className="px-3 py-1.5 border rounded-lg bg-background text-sm"
                 >
-                  <option value="all">הכל</option>
+                  <option value="all">כל הסטטוסים</option>
                   <option value="pending">לא טופל</option>
                   <option value="sent">טופל</option>
                 </select>
