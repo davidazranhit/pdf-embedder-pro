@@ -183,13 +183,13 @@ const FileRequest = () => {
             {isLoadingCourses ? (
               <div className="h-10 bg-muted animate-pulse rounded-md" />
             ) : courses.length > 0 ? (
-              <Select value={courseName} onValueChange={setCourseName}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="בחר קורס..." />
+              <Select dir="rtl" value={courseName} onValueChange={setCourseName}>
+                <SelectTrigger className="w-full flex-row-reverse">
+                  <SelectValue placeholder="בחר קורס" />
                 </SelectTrigger>
-                <SelectContent className="bg-background border shadow-lg z-50">
+                <SelectContent className="bg-background border shadow-lg z-50" dir="rtl">
                   {courses.map((course) => (
-                    <SelectItem key={course.id} value={course.name}>
+                    <SelectItem key={course.id} value={course.name} className="text-right">
                       {course.name}
                     </SelectItem>
                   ))}
