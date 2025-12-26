@@ -8,6 +8,7 @@ import { Login } from "./pages/Login";
 import Index from "./pages/Index";
 import FileRequest from "./pages/FileRequest";
 import Settings from "./pages/Settings";
+import Statistics from "./pages/Statistics";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <Settings />
+              </ProtectedRoute>
+            }
+            />
+          <Route
+            path="/sys-admin/statistics"
+            element={
+              <ProtectedRoute>
+                <Statistics />
               </ProtectedRoute>
             }
           />
