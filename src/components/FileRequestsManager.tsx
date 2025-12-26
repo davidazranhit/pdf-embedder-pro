@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Send, Filter, FileStack, Calendar as CalendarIcon, X, Users, ArrowLeft } from "lucide-react";
+import { FileText, Send, Filter, FileStack, Calendar as CalendarIcon, X, Users, ArrowLeft, Check } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -43,6 +43,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface FileRequest {
   id: string;
@@ -90,6 +91,14 @@ export const FileRequestsManager = () => {
   const [userFilter, setUserFilter] = useState<{ type: 'email' | 'id_number'; value: string } | null>(null);
   const [courseFilter, setCourseFilter] = useState<string>("all");
   const [courses, setCourses] = useState<Course[]>([]);
+  
+  // New state for file selection dialog
+  const [showFileSendDialog, setShowFileSendDialog] = useState(false);
+  const [selectedFilesDialogCategory, setSelectedFilesDialogCategory] = useState<string>("");
+  const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
+  const [sendingRequest, setSendingRequest] = useState<FileRequest | null>(null);
+  const [isSendingFiles, setIsSendingFiles] = useState(false);
+  
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -352,6 +361,138 @@ export const FileRequestsManager = () => {
     }
   };
 
+  // Get templates filtered by selected category
+  const filteredTemplatesForDialog = selectedFilesDialogCategory 
+    ? templates.filter((t) => t.category === selectedFilesDialogCategory)
+    : [];
+
+  const handleToggleFileSelection = (fileId: string) => {
+    setSelectedFileIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(fileId)) {
+        newSet.delete(fileId);
+      } else {
+        newSet.add(fileId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAllFiles = () => {
+    if (selectedFileIds.size === filteredTemplatesForDialog.length) {
+      setSelectedFileIds(new Set());
+    } else {
+      setSelectedFileIds(new Set(filteredTemplatesForDialog.map((t) => t.id)));
+    }
+  };
+
+  const handleOpenFileSendDialog = (request: FileRequest) => {
+    setSendingRequest(request);
+    setSelectedFilesDialogCategory("");
+    setSelectedFileIds(new Set());
+    setShowFileSendDialog(true);
+  };
+
+  const handleSendSelectedFiles = async () => {
+    if (!sendingRequest || selectedFileIds.size === 0) return;
+
+    setIsSendingFiles(true);
+    try {
+      // Get selected templates
+      const selectedTemplatesList = filteredTemplatesForDialog.filter((t) => 
+        selectedFileIds.has(t.id)
+      );
+      
+      if (selectedTemplatesList.length === 0) {
+        toast({ title: "שגיאה", description: "לא נבחרו קבצים לשליחה", variant: "destructive" });
+        return;
+      }
+
+      toast({
+        title: "מעבד קבצים",
+        description: `מעבד ${selectedTemplatesList.length} קבצים...`,
+      });
+
+      // Collect all file paths
+      const allFileIds = selectedTemplatesList.map((template) => template.file_path);
+
+      // Process watermarks
+      const { data: processData, error: processError } = await supabase.functions.invoke(
+        "process-watermark",
+        {
+          body: {
+            fileIds: allFileIds,
+            email: sendingRequest.email,
+            userId: sendingRequest.id_number,
+          },
+        }
+      );
+
+      if (processError || !processData?.files || processData.files.length === 0) {
+        console.error("Error processing watermarks:", processError);
+        toast({
+          title: "שגיאה",
+          description: "לא הצלחנו לעבד את הקבצים",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Extract processed file info
+      const processedFiles = processData.files.map((f: any) => ({
+        processedId: f.processedId,
+        originalName: f.originalName
+      }));
+
+      // Send email
+      const { error: sendError } = await supabase.functions.invoke("send-watermarked-files", {
+        body: {
+          email: sendingRequest.email,
+          fileIds: processedFiles,
+        },
+      });
+
+      if (sendError) {
+        console.error("Error sending email:", sendError);
+        toast({
+          title: "שגיאה",
+          description: "שגיאה בשליחת המייל",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Update request status
+      await supabase
+        .from("file_requests")
+        .update({
+          status: "sent",
+          sent_date: new Date().toISOString(),
+        })
+        .eq("id", sendingRequest.id);
+
+      toast({
+        title: "הצלחה",
+        description: `${processedFiles.length} קבצים נשלחו בהצלחה`,
+      });
+
+      setShowFileSendDialog(false);
+      setSendingRequest(null);
+      setSelectedFilesDialogCategory("");
+      setSelectedFileIds(new Set());
+      fetchRequests();
+    } catch (error) {
+      console.error("Error in handleSendSelectedFiles:", error);
+      toast({
+        title: "שגיאה",
+        description: "שגיאה כללית בתהליך השליחה",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingFiles(false);
+    }
+  };
+
   const handleQuickFilter = (value: string) => {
     setQuickFilter(value);
     const now = new Date();
@@ -453,6 +594,130 @@ export const FileRequestsManager = () => {
                 disabled={!selectedCategory || isSending}
               >
                 {isSending ? "מעבד ושולח..." : "שלח קבצים"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* New File Selection Dialog */}
+      <Dialog open={showFileSendDialog} onOpenChange={setShowFileSendDialog}>
+        <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>שלח קבצים נבחרים</DialogTitle>
+            <DialogDescription>
+              בחר קטגוריה ולאחר מכן סמן את הקבצים שברצונך לשלוח ל-{sendingRequest?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {/* Request Info */}
+            {sendingRequest && (
+              <div className="bg-muted p-3 rounded-lg text-sm space-y-1">
+                <div>
+                  <strong>מייל:</strong> {sendingRequest.email}
+                </div>
+                <div>
+                  <strong>תעודת זהות:</strong> {sendingRequest.id_number}
+                </div>
+                <div>
+                  <strong>קורס מבוקש:</strong> {sendingRequest.course_name}
+                </div>
+              </div>
+            )}
+
+            {/* Category Selection */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">בחר קטגוריה</label>
+              <Select 
+                value={selectedFilesDialogCategory} 
+                onValueChange={(value) => {
+                  setSelectedFilesDialogCategory(value);
+                  setSelectedFileIds(new Set());
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="בחר קטגוריה..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((category) => (
+                    <SelectItem key={category.name} value={category.name}>
+                      {category.name} ({category.count} קבצים)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* File List */}
+            {selectedFilesDialogCategory && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">
+                    קבצים בקטגוריה ({filteredTemplatesForDialog.length})
+                  </label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSelectAllFiles}
+                  >
+                    {selectedFileIds.size === filteredTemplatesForDialog.length ? "בטל הכל" : "בחר הכל"}
+                  </Button>
+                </div>
+                <div className="border rounded-lg max-h-[250px] overflow-y-auto">
+                  {filteredTemplatesForDialog.length === 0 ? (
+                    <div className="p-4 text-center text-muted-foreground">
+                      אין קבצים בקטגוריה זו
+                    </div>
+                  ) : (
+                    filteredTemplatesForDialog.map((template) => (
+                      <div
+                        key={template.id}
+                        className={cn(
+                          "flex items-center gap-3 p-3 border-b last:border-b-0 cursor-pointer hover:bg-muted/50 transition-colors",
+                          selectedFileIds.has(template.id) && "bg-primary/10"
+                        )}
+                        onClick={() => handleToggleFileSelection(template.id)}
+                      >
+                        <Checkbox
+                          checked={selectedFileIds.has(template.id)}
+                          onCheckedChange={() => handleToggleFileSelection(template.id)}
+                        />
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="flex-1 text-sm">{template.name}</span>
+                        {selectedFileIds.has(template.id) && (
+                          <Check className="w-4 h-4 text-primary" />
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+                {selectedFileIds.size > 0 && (
+                  <div className="text-sm text-muted-foreground">
+                    נבחרו {selectedFileIds.size} קבצים
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-2 justify-end pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowFileSendDialog(false);
+                  setSendingRequest(null);
+                  setSelectedFilesDialogCategory("");
+                  setSelectedFileIds(new Set());
+                }}
+                disabled={isSendingFiles}
+              >
+                ביטול
+              </Button>
+              <Button
+                onClick={handleSendSelectedFiles}
+                disabled={selectedFileIds.size === 0 || isSendingFiles}
+              >
+                {isSendingFiles ? "מעבד ושולח..." : `שלח ${selectedFileIds.size} קבצים`}
               </Button>
             </div>
           </div>
@@ -694,7 +959,7 @@ export const FileRequestsManager = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1.5">
-                          <Button size="sm" className="w-full" onClick={() => handleGoToSingleUser(request)}>
+                          <Button size="sm" className="w-full" onClick={() => handleOpenFileSendDialog(request)}>
                             <Send className="w-4 h-4 ml-2" />
                             שלח קבצים
                           </Button>
@@ -708,7 +973,7 @@ export const FileRequestsManager = () => {
                             }}
                           >
                             <FileStack className="w-4 h-4 ml-2" />
-                            שלח מקטגוריה
+                            שלח כל הקטגוריה
                           </Button>
                           <Button size="sm" variant="outline" className="w-full" onClick={() => toggleStatus(request)}>
                             {request.status === "sent" ? "סמן לא טופל" : "סמן טופל"}
