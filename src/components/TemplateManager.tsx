@@ -195,7 +195,7 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
       
       toast({
         title: "קטגוריה חדשה נוצרה",
-        description: `כעת תוכל להוסיף תבניות לקטגוריה "${categoryName}"`,
+        description: "כעת ניתן להוסיף קבצים לקטגוריה החדשה",
       });
     } catch (error) {
       console.error("Error creating category:", error);
