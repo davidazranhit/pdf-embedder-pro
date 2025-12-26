@@ -263,28 +263,6 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
         
         <div className="space-y-4">
           <div className="flex items-center gap-4 flex-wrap">
-            <select 
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-3 py-2 border rounded-lg bg-background"
-            >
-              {categories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
-            <div className="relative">
-              <input
-                type="file"
-                accept=".pdf"
-                onChange={(e) => handleUploadTemplate(e, selectedCategory)}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                disabled={isLoading}
-              />
-              <Button disabled={isLoading} size="sm">
-                <Upload className="w-4 h-4 ml-2" />
-                הוסף תבנית לקטגוריה
-              </Button>
-            </div>
             <Button 
               onClick={() => setShowNewCategoryInput(!showNewCategoryInput)} 
               variant="outline" 
