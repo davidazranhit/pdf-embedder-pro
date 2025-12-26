@@ -4,7 +4,7 @@ import { buildStoragePath } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, Trash2, CheckCircle2, Circle } from "lucide-react";
+import { Upload, FileText, Trash2, CheckCircle2, Circle, Settings, Pencil, X } from "lucide-react";
 
 interface Template {
   id: string;
@@ -34,6 +34,9 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [isManagingCategories, setIsManagingCategories] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [editCategoryName, setEditCategoryName] = useState("");
   
   const toggleCategoryCollapse = (category: string) => {
     setCollapsedCategories((prev) => ({ ...prev, [category]: !prev[category] }));
@@ -254,6 +257,108 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
     return acc;
   }, {} as Record<string, Template[]>);
 
+  const handleEditCategory = async (oldName: string) => {
+    if (!editCategoryName.trim()) {
+      toast({
+        title: "שגיאה",
+        description: "אנא הזן שם לקטגוריה",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newName = editCategoryName.trim();
+
+    if (newName === oldName) {
+      setEditingCategory(null);
+      setEditCategoryName("");
+      return;
+    }
+
+    if (categories.includes(newName)) {
+      toast({
+        title: "שגיאה",
+        description: "קטגוריה בשם זה כבר קיימת",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Update category in categories table
+      const { error: catError } = await supabase
+        .from("categories")
+        .update({ name: newName })
+        .eq("name", oldName);
+
+      if (catError) throw catError;
+
+      // Update all templates with this category
+      const { error: templateError } = await supabase
+        .from("pdf_templates")
+        .update({ category: newName })
+        .eq("category", oldName);
+
+      if (templateError) throw templateError;
+
+      // Update local state
+      setDbCategories(prev => prev.map(c => c === oldName ? newName : c));
+      setTemplates(prev => prev.map(t => t.category === oldName ? { ...t, category: newName } : t));
+      setEditingCategory(null);
+      setEditCategoryName("");
+
+      toast({
+        title: "קטגוריה עודכנה",
+        description: `שם הקטגוריה שונה ל-"${newName}"`,
+      });
+    } catch (error) {
+      console.error("Error updating category:", error);
+      toast({
+        title: "שגיאה",
+        description: "לא ניתן לעדכן את הקטגוריה",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteCategory = async (categoryName: string) => {
+    const categoryTemplates = templates.filter(t => t.category === categoryName);
+    
+    if (categoryTemplates.length > 0) {
+      toast({
+        title: "לא ניתן למחוק",
+        description: "יש קבצים בקטגוריה זו. יש להעביר או למחוק אותם קודם.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Delete from categories table
+      const { error } = await supabase
+        .from("categories")
+        .delete()
+        .eq("name", categoryName);
+
+      if (error) throw error;
+
+      // Update local state
+      setDbCategories(prev => prev.filter(c => c !== categoryName));
+
+      toast({
+        title: "קטגוריה נמחקה",
+        description: `הקטגוריה "${categoryName}" הוסרה`,
+      });
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      toast({
+        title: "שגיאה",
+        description: "לא ניתן למחוק את הקטגוריה",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <Card className="p-6">
       <div className="space-y-4">
@@ -269,6 +374,14 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
               size="sm"
             >
               + קטגוריה חדשה
+            </Button>
+            <Button 
+              onClick={() => setIsManagingCategories(!isManagingCategories)} 
+              variant={isManagingCategories ? "default" : "outline"}
+              size="sm"
+            >
+              <Settings className="w-4 h-4 ml-2" />
+              {isManagingCategories ? "סיים ניהול" : "נהל קטגוריות"}
             </Button>
           </div>
           
@@ -321,7 +434,65 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
               return (
                 <div key={category} className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-lg font-semibold text-foreground">{category}</h4>
+                    {editingCategory === category ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={editCategoryName}
+                          onChange={(e) => setEditCategoryName(e.target.value)}
+                          className="px-2 py-1 border rounded bg-background text-foreground"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleEditCategory(category);
+                            } else if (e.key === 'Escape') {
+                              setEditingCategory(null);
+                              setEditCategoryName("");
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <Button size="sm" onClick={() => handleEditCategory(category)}>
+                          שמור
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={() => {
+                            setEditingCategory(null);
+                            setEditCategoryName("");
+                          }}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-lg font-semibold text-foreground">{category}</h4>
+                        {isManagingCategories && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingCategory(category);
+                                setEditCategoryName(category);
+                              }}
+                              className="h-7 w-7 p-0"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteCategory(category)}
+                              className="h-7 w-7 p-0 hover:bg-destructive/10 hover:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    )}
                     <div className="flex items-center gap-2">
                       {categoryTemplates.length > 0 && (
                         <>
