@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { buildStoragePath } from "@/lib/utils";
-import { FileCheck, Send, Download, User, Inbox, Settings } from "lucide-react";
+import { FileCheck, Send, Download, User, Inbox, Settings, BarChart3 } from "lucide-react";
 
 interface Template {
   id: string;
@@ -504,12 +504,20 @@ ${links.map((l) => {
           {/* Header */}
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <Link to="/sys-admin/settings">
-                <Button variant="outline" className="flex items-center gap-2">
-                  <Settings className="w-4 h-4" />
-                  הגדרות
-                </Button>
-              </Link>
+              <div className="flex items-center gap-2">
+                <Link to="/sys-admin/settings">
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <Settings className="w-4 h-4" />
+                    הגדרות
+                  </Button>
+                </Link>
+                <Link to="/sys-admin/statistics">
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4" />
+                    סטטיסטיקה
+                  </Button>
+                </Link>
+              </div>
               <LogoutButton />
             </div>
             <div className="text-center">
