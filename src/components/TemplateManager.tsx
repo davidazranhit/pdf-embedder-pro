@@ -437,7 +437,7 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
                   <span className="text-primary">{pendingEditCategory?.newName}</span>
                 </div>
               </div>
-              <div className="text-sm">כל הקבצים בקטגוריה זו יעודכנו לשם החדש.</div>
+              <div className="text-sm">כל הקבצים בקטגוריה זו יופיעו תחת שם הקטגוריה החדשה.</div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-row-reverse gap-2">
