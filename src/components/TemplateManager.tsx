@@ -5,6 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, FileText, Trash2, CheckCircle2, Circle, Settings, Pencil, X } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Template {
   id: string;
@@ -37,6 +47,12 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
   const [isManagingCategories, setIsManagingCategories] = useState(false);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editCategoryName, setEditCategoryName] = useState("");
+  
+  // Confirmation dialogs state
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
+  const [editConfirmOpen, setEditConfirmOpen] = useState(false);
+  const [pendingEditCategory, setPendingEditCategory] = useState<{ oldName: string; newName: string } | null>(null);
   
   const toggleCategoryCollapse = (category: string) => {
     setCollapsedCategories((prev) => ({ ...prev, [category]: !prev[category] }));
@@ -257,7 +273,7 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
     return acc;
   }, {} as Record<string, Template[]>);
 
-  const handleEditCategory = async (oldName: string) => {
+  const requestEditCategory = (oldName: string) => {
     if (!editCategoryName.trim()) {
       toast({
         title: "שגיאה",
@@ -283,6 +299,16 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
       });
       return;
     }
+
+    // Show confirmation dialog
+    setPendingEditCategory({ oldName, newName });
+    setEditConfirmOpen(true);
+  };
+
+  const confirmEditCategory = async () => {
+    if (!pendingEditCategory) return;
+
+    const { oldName, newName } = pendingEditCategory;
 
     try {
       // Update category in categories table
@@ -318,10 +344,13 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
         description: "לא ניתן לעדכן את הקטגוריה",
         variant: "destructive",
       });
+    } finally {
+      setEditConfirmOpen(false);
+      setPendingEditCategory(null);
     }
   };
 
-  const handleDeleteCategory = async (categoryName: string) => {
+  const requestDeleteCategory = (categoryName: string) => {
     const categoryTemplates = templates.filter(t => t.category === categoryName);
     
     if (categoryTemplates.length > 0) {
@@ -333,21 +362,28 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
       return;
     }
 
+    setCategoryToDelete(categoryName);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteCategory = async () => {
+    if (!categoryToDelete) return;
+
     try {
       // Delete from categories table
       const { error } = await supabase
         .from("categories")
         .delete()
-        .eq("name", categoryName);
+        .eq("name", categoryToDelete);
 
       if (error) throw error;
 
       // Update local state
-      setDbCategories(prev => prev.filter(c => c !== categoryName));
+      setDbCategories(prev => prev.filter(c => c !== categoryToDelete));
 
       toast({
         title: "קטגוריה נמחקה",
-        description: `הקטגוריה "${categoryName}" הוסרה`,
+        description: `הקטגוריה "${categoryToDelete}" הוסרה`,
       });
     } catch (error) {
       console.error("Error deleting category:", error);
@@ -356,11 +392,67 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
         description: "לא ניתן למחוק את הקטגוריה",
         variant: "destructive",
       });
+    } finally {
+      setDeleteConfirmOpen(false);
+      setCategoryToDelete(null);
     }
   };
 
   return (
-    <Card className="p-6">
+    <>
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>מחיקת קטגוריה</AlertDialogTitle>
+            <AlertDialogDescription>
+              האם אתה בטוח שברצונך למחוק את הקטגוריה "{categoryToDelete}"?
+              <br />
+              פעולה זו אינה ניתנת לביטול.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row-reverse gap-2">
+            <AlertDialogCancel>ביטול</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteCategory} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              מחק קטגוריה
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Edit Confirmation Dialog */}
+      <AlertDialog open={editConfirmOpen} onOpenChange={setEditConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>שינוי שם קטגוריה</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <div>האם אתה בטוח שברצונך לשנות את שם הקטגוריה?</div>
+              <div className="bg-muted p-3 rounded-lg text-foreground">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">שם נוכחי:</span>
+                  <span>{pendingEditCategory?.oldName}</span>
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="font-medium">שם חדש:</span>
+                  <span className="text-primary">{pendingEditCategory?.newName}</span>
+                </div>
+              </div>
+              <div className="text-sm">כל הקבצים בקטגוריה זו יעודכנו לשם החדש.</div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row-reverse gap-2">
+            <AlertDialogCancel onClick={() => {
+              setEditConfirmOpen(false);
+              setPendingEditCategory(null);
+            }}>ביטול</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmEditCategory}>
+              שנה שם
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Card className="p-6">
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-xl font-semibold text-foreground">תבניות PDF מוכנות</h3>
@@ -443,7 +535,7 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
                           className="px-2 py-1 border rounded bg-background text-foreground"
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
-                              handleEditCategory(category);
+                              requestEditCategory(category);
                             } else if (e.key === 'Escape') {
                               setEditingCategory(null);
                               setEditCategoryName("");
@@ -451,7 +543,7 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
                           }}
                           autoFocus
                         />
-                        <Button size="sm" onClick={() => handleEditCategory(category)}>
+                        <Button size="sm" onClick={() => requestEditCategory(category)}>
                           שמור
                         </Button>
                         <Button 
@@ -484,7 +576,7 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleDeleteCategory(category)}
+                              onClick={() => requestDeleteCategory(category)}
                               className="h-7 w-7 p-0 hover:bg-destructive/10 hover:text-destructive"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -592,5 +684,6 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
         )}
       </div>
     </Card>
+    </>
   );
 };
