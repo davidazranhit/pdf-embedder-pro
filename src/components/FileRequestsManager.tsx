@@ -565,7 +565,7 @@ export const FileRequestsManager = () => {
               </Select>
             </div>
             {selectedRequest && (
-              <div className="bg-muted p-3 rounded-lg text-sm space-y-1">
+              <div className="bg-muted p-3 rounded-lg text-sm space-y-2">
                 <div>
                   <strong>מייל:</strong> {selectedRequest.email}
                 </div>
@@ -575,6 +575,12 @@ export const FileRequestsManager = () => {
                 <div>
                   <strong>קורס:</strong> {selectedRequest.course_name}
                 </div>
+                {selectedRequest.notes && (
+                  <div className="pt-2 border-t border-border">
+                    <strong>הערות:</strong>
+                    <p className="mt-1 text-muted-foreground whitespace-pre-wrap">{selectedRequest.notes}</p>
+                  </div>
+                )}
               </div>
             )}
             <div className="flex gap-2 justify-end">
@@ -612,7 +618,7 @@ export const FileRequestsManager = () => {
           <div className="space-y-4 py-4">
             {/* Request Info */}
             {sendingRequest && (
-              <div className="bg-muted p-3 rounded-lg text-sm space-y-1">
+              <div className="bg-muted p-3 rounded-lg text-sm space-y-2">
                 <div>
                   <strong>מייל:</strong> {sendingRequest.email}
                 </div>
@@ -622,6 +628,12 @@ export const FileRequestsManager = () => {
                 <div>
                   <strong>קורס מבוקש:</strong> {sendingRequest.course_name}
                 </div>
+                {sendingRequest.notes && (
+                  <div className="pt-2 border-t border-border">
+                    <strong>הערות:</strong>
+                    <p className="mt-1 text-muted-foreground whitespace-pre-wrap">{sendingRequest.notes}</p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -724,45 +736,48 @@ export const FileRequestsManager = () => {
         </DialogContent>
       </Dialog>
 
-      <Card className="p-6">
+      <Card className="p-4 md:p-6">
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <h3 className="text-xl font-semibold text-foreground">בקשות לקבצים</h3>
-                <Badge variant="outline" className="text-sm">
+            {/* Header - Mobile optimized */}
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-lg md:text-xl font-semibold text-foreground">בקשות לקבצים</h3>
+                <Badge variant="outline" className="text-xs md:text-sm">
                   {filteredRequests.length === requests.length 
                     ? `${requests.length} בקשות` 
                     : `${filteredRequests.length} מתוך ${requests.length}`}
                 </Badge>
-                {userFilter && (
-                  <div className="flex items-center gap-2 bg-primary/10 text-primary px-3 py-1.5 rounded-full">
-                    <Users className="w-4 h-4" />
-                    <span className="text-sm font-medium">
-                      מציג בקשות של: {userFilter.value}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={clearUserFilter}
-                      className="h-5 w-5 p-0 hover:bg-primary/20"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                )}
               </div>
-              <div className="flex items-center gap-2">
+              
+              {userFilter && (
+                <div className="flex items-center gap-2 bg-primary/10 text-primary px-3 py-1.5 rounded-full w-fit">
+                  <Users className="w-4 h-4" />
+                  <span className="text-sm font-medium truncate max-w-[200px]">
+                    מציג בקשות של: {userFilter.value}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearUserFilter}
+                    className="h-5 w-5 p-0 hover:bg-primary/20"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+              
+              {/* Filters - Responsive grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="חיפוש לפי ת.ז, מייל או קורס"
-                  className="max-w-[220px]"
+                  placeholder="חיפוש..."
+                  className="w-full"
                 />
-                <Filter className="w-4 h-4 text-muted-foreground" />
                 <select
                   value={courseFilter}
                   onChange={(e) => setCourseFilter(e.target.value)}
-                  className="px-3 py-1.5 border rounded-lg bg-background text-sm"
+                  className="px-3 py-2 border rounded-lg bg-background text-sm w-full"
                 >
                   <option value="all">כל הקורסים</option>
                   {courses.map((course) => (
@@ -772,7 +787,7 @@ export const FileRequestsManager = () => {
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value as any)}
-                  className="px-3 py-1.5 border rounded-lg bg-background text-sm"
+                  className="px-3 py-2 border rounded-lg bg-background text-sm w-full"
                 >
                   <option value="all">כל הסטטוסים</option>
                   <option value="pending">לא טופל</option>
@@ -875,23 +890,27 @@ export const FileRequestsManager = () => {
               <p>אין בקשות במערכת</p>
             </div>
           ) : (
-            <div className="rounded-lg border">
+            <>
+            {/* Desktop Table */}
+            <div className="hidden md:block rounded-lg border overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-right">מייל</TableHead>
-                    <TableHead className="text-right">תעודת זהות</TableHead>
-                    <TableHead className="text-right">קורס מבוקש</TableHead>
-                    <TableHead className="text-right">הערות</TableHead>
-                    <TableHead className="text-right">תאריך בקשה</TableHead>
-                    <TableHead className="text-right">סטטוס</TableHead>
-                    <TableHead className="text-right">פעולות</TableHead>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="text-right font-semibold">מייל</TableHead>
+                    <TableHead className="text-right font-semibold">ת.ז</TableHead>
+                    <TableHead className="text-right font-semibold">קורס</TableHead>
+                    <TableHead className="text-right font-semibold">תאריך</TableHead>
+                    <TableHead className="text-right font-semibold">סטטוס</TableHead>
+                    <TableHead className="text-right font-semibold">פעולות</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredRequests.map((request) => (
-                    <TableRow key={request.id} className={isRepeatUser(request) ? "bg-amber-50 dark:bg-amber-950/20" : ""}>
-                      <TableCell className="font-medium">
+                    <TableRow key={request.id} className={cn(
+                      "hover:bg-muted/30 transition-colors",
+                      isRepeatUser(request) && "bg-amber-50 dark:bg-amber-950/20"
+                    )}>
+                      <TableCell className="font-medium py-3">
                         <TooltipProvider>
                           <div className="flex items-center gap-2">
                             {isRepeatUser(request) && (
@@ -900,7 +919,7 @@ export const FileRequestsManager = () => {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="h-6 w-6 p-0 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/50 dark:hover:bg-amber-800/50 rounded-full"
+                                    className="h-5 w-5 p-0 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/50 dark:hover:bg-amber-800/50 rounded-full flex-shrink-0"
                                     onClick={() => handleFilterByUser(request, 'email')}
                                   >
                                     <span className="text-xs font-bold text-amber-700 dark:text-amber-300">
@@ -913,70 +932,65 @@ export const FileRequestsManager = () => {
                                 </TooltipContent>
                               </Tooltip>
                             )}
+                            {request.notes && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="outline" className="text-xs px-1.5 py-0.5 cursor-help">
+                                    📝
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-[300px]">
+                                  <p className="whitespace-pre-wrap">{request.notes}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
                             <button
                               onClick={() => handleFilterByUser(request, 'email')}
-                              className="hover:underline hover:text-primary transition-colors text-right"
+                              className="hover:underline hover:text-primary transition-colors text-right text-sm truncate max-w-[180px]"
                             >
                               {request.email}
                             </button>
                           </div>
                         </TooltipProvider>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-3">
                         <button
                           onClick={() => handleFilterByUser(request, 'id_number')}
-                          className="hover:underline hover:text-primary transition-colors"
+                          className="hover:underline hover:text-primary transition-colors text-sm"
                         >
                           {request.id_number}
                         </button>
                       </TableCell>
-                      <TableCell>{request.course_name}</TableCell>
-                      <TableCell className="max-w-[150px]">
-                        {request.notes ? (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="text-sm text-muted-foreground truncate block cursor-help">
-                                  {request.notes.length > 30 ? `${request.notes.substring(0, 30)}...` : request.notes}
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent className="max-w-[300px]">
-                                <p className="whitespace-pre-wrap">{request.notes}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        ) : (
-                          <span className="text-muted-foreground/50">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>{formatDate(request.submission_date)}</TableCell>
-                      <TableCell>
+                      <TableCell className="py-3 text-sm">{request.course_name}</TableCell>
+                      <TableCell className="py-3 text-sm text-muted-foreground">{formatDate(request.submission_date)}</TableCell>
+                      <TableCell className="py-3">
                         <Badge
                           variant={request.status === "sent" ? "default" : "secondary"}
+                          className="text-xs"
                         >
                           {request.status === "sent" ? "טופל" : "לא טופל"}
                         </Badge>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1.5">
-                          <Button size="sm" className="w-full" onClick={() => handleOpenFileSendDialog(request)}>
-                            <Send className="w-4 h-4 ml-2" />
-                            שלח קבצים
+                      <TableCell className="py-3">
+                        <div className="flex items-center gap-1.5">
+                          <Button size="sm" className="h-8 text-xs" onClick={() => handleOpenFileSendDialog(request)}>
+                            <Send className="w-3 h-3 ml-1" />
+                            שלח
                           </Button>
                           <Button
                             size="sm"
                             variant="secondary"
-                            className="w-full"
+                            className="h-8 text-xs"
                             onClick={() => {
                               setSelectedRequest(request);
                               setShowTemplateDialog(true);
                             }}
                           >
-                            <FileStack className="w-4 h-4 ml-2" />
-                            שלח כל הקטגוריה
+                            <FileStack className="w-3 h-3 ml-1" />
+                            קטגוריה
                           </Button>
-                          <Button size="sm" variant="outline" className="w-full" onClick={() => toggleStatus(request)}>
-                            {request.status === "sent" ? "סמן לא טופל" : "סמן טופל"}
+                          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => toggleStatus(request)}>
+                            {request.status === "sent" ? "בטל" : "סמן"}
                           </Button>
                         </div>
                         {request.status === "sent" && request.sent_date && (
@@ -990,6 +1004,89 @@ export const FileRequestsManager = () => {
                 </TableBody>
               </Table>
             </div>
+
+            {/* Mobile Cards */}
+            <div className="md:hidden space-y-3">
+              {filteredRequests.map((request) => (
+                <div 
+                  key={request.id} 
+                  className={cn(
+                    "border rounded-lg p-4 space-y-3",
+                    isRepeatUser(request) && "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"
+                  )}
+                >
+                  {/* Header with status and repeat indicator */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {isRepeatUser(request) && (
+                        <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300 text-xs">
+                          חוזר ({getRepeatCount(request)})
+                        </Badge>
+                      )}
+                      <Badge
+                        variant={request.status === "sent" ? "default" : "secondary"}
+                        className="text-xs"
+                      >
+                        {request.status === "sent" ? "טופל" : "לא טופל"}
+                      </Badge>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{formatDate(request.submission_date)}</span>
+                  </div>
+
+                  {/* Contact info */}
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => handleFilterByUser(request, 'email')}
+                      className="text-sm font-medium hover:underline hover:text-primary transition-colors block truncate w-full text-right"
+                    >
+                      {request.email}
+                    </button>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>ת.ז: {request.id_number}</span>
+                      <span>{request.course_name}</span>
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  {request.notes && (
+                    <div className="bg-muted/50 rounded p-2 text-sm">
+                      <span className="font-medium">הערות: </span>
+                      <span className="text-muted-foreground">{request.notes}</span>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex gap-2 pt-2 border-t">
+                    <Button size="sm" className="flex-1 h-9" onClick={() => handleOpenFileSendDialog(request)}>
+                      <Send className="w-4 h-4 ml-1" />
+                      שלח קבצים
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="flex-1 h-9"
+                      onClick={() => {
+                        setSelectedRequest(request);
+                        setShowTemplateDialog(true);
+                      }}
+                    >
+                      <FileStack className="w-4 h-4 ml-1" />
+                      קטגוריה
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-9 px-3" onClick={() => toggleStatus(request)}>
+                      {request.status === "sent" ? "בטל" : "✓"}
+                    </Button>
+                  </div>
+
+                  {request.status === "sent" && request.sent_date && (
+                    <div className="text-xs text-muted-foreground text-center">
+                      נשלח ב-{formatDate(request.sent_date)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            </>
           )}
         </div>
       </Card>
