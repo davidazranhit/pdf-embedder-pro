@@ -388,7 +388,9 @@ export const FileRequestsManager = () => {
 
   const handleOpenFileSendDialog = (request: FileRequest) => {
     setSendingRequest(request);
-    setSelectedFilesDialogCategory("");
+    // Auto-select category based on course name if matching category exists
+    const matchingCategory = categories.find(c => c.name === request.course_name);
+    setSelectedFilesDialogCategory(matchingCategory ? matchingCategory.name : "");
     setSelectedFileIds(new Set());
     setShowFileSendDialog(true);
   };
@@ -983,6 +985,9 @@ export const FileRequestsManager = () => {
                             className="h-8 text-xs"
                             onClick={() => {
                               setSelectedRequest(request);
+                              // Auto-select category based on course name
+                              const matchingCategory = categories.find(c => c.name === request.course_name);
+                              setSelectedCategory(matchingCategory ? matchingCategory.name : "");
                               setShowTemplateDialog(true);
                             }}
                           >
@@ -1067,6 +1072,9 @@ export const FileRequestsManager = () => {
                       className="flex-1 h-9"
                       onClick={() => {
                         setSelectedRequest(request);
+                        // Auto-select category based on course name
+                        const matchingCategory = categories.find(c => c.name === request.course_name);
+                        setSelectedCategory(matchingCategory ? matchingCategory.name : "");
                         setShowTemplateDialog(true);
                       }}
                     >
