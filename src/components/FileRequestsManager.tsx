@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Send, Filter, FileStack, Calendar as CalendarIcon, X, Users, ArrowLeft, Check } from "lucide-react";
+import { FileText, Send, Filter, FileStack, Calendar as CalendarIcon, X, Users, ArrowLeft, Check, Mail, User, BookOpen, Clock, MessageSquare, ChevronDown } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -44,6 +44,11 @@ import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface FileRequest {
   id: string;
@@ -91,6 +96,7 @@ export const FileRequestsManager = () => {
   const [userFilter, setUserFilter] = useState<{ type: 'email' | 'id_number'; value: string } | null>(null);
   const [courseFilter, setCourseFilter] = useState<string>("all");
   const [courses, setCourses] = useState<Course[]>([]);
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   
   // New state for file selection dialog
   const [showFileSendDialog, setShowFileSendDialog] = useState(false);
@@ -540,52 +546,79 @@ export const FileRequestsManager = () => {
     });
   };
 
+  const formatShortDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("he-IL", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  // Stats
+  const pendingCount = requests.filter(r => r.status === "pending").length;
+  const sentCount = requests.filter(r => r.status === "sent").length;
+
   return (
     <>
+      {/* Send Category Dialog */}
       <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>שלח קבצים מקטגוריה</DialogTitle>
+            <DialogTitle className="text-xl">שלח קבצים מקטגוריה</DialogTitle>
             <DialogDescription>
-              בחר קטגוריה לשליחת כל הקבצים ל-{selectedRequest?.email}
+              בחר קטגוריה לשליחת כל הקבצים שלה
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Request Info Card */}
+            {selectedRequest && (
+              <div className="bg-gradient-to-br from-muted/50 to-muted rounded-xl p-4 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm truncate">{selectedRequest.email}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm">{selectedRequest.id_number}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">{selectedRequest.course_name}</span>
+                </div>
+                {selectedRequest.notes && (
+                  <div className="pt-3 border-t border-border/50">
+                    <div className="flex items-start gap-2">
+                      <MessageSquare className="w-4 h-4 text-muted-foreground mt-0.5" />
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedRequest.notes}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
             <div className="space-y-2">
               <label className="text-sm font-medium">בחר קטגוריה</label>
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger>
+                <SelectTrigger className="h-11">
                   <SelectValue placeholder="בחר קטגוריה..." />
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((category) => (
                     <SelectItem key={category.name} value={category.name}>
-                      {category.name} ({category.count} קבצים)
+                      <div className="flex items-center justify-between w-full gap-4">
+                        <span>{category.name}</span>
+                        <Badge variant="secondary" className="text-xs">{category.count} קבצים</Badge>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            {selectedRequest && (
-              <div className="bg-muted p-3 rounded-lg text-sm space-y-2">
-                <div>
-                  <strong>מייל:</strong> {selectedRequest.email}
-                </div>
-                <div>
-                  <strong>תעודת זהות:</strong> {selectedRequest.id_number}
-                </div>
-                <div>
-                  <strong>קורס:</strong> {selectedRequest.course_name}
-                </div>
-                {selectedRequest.notes && (
-                  <div className="pt-2 border-t border-border">
-                    <strong>הערות:</strong>
-                    <p className="mt-1 text-muted-foreground whitespace-pre-wrap">{selectedRequest.notes}</p>
-                  </div>
-                )}
-              </div>
-            )}
-            <div className="flex gap-2 justify-end">
+            
+            <div className="flex gap-3 justify-end pt-2">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -600,40 +633,58 @@ export const FileRequestsManager = () => {
               <Button
                 onClick={handleSendFromCategory}
                 disabled={!selectedCategory || isSending}
+                className="min-w-[120px]"
               >
-                {isSending ? "מעבד ושולח..." : "שלח קבצים"}
+                {isSending ? (
+                  <span className="flex items-center gap-2">
+                    <span className="animate-spin">⏳</span>
+                    מעבד...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <Send className="w-4 h-4" />
+                    שלח קבצים
+                  </span>
+                )}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* New File Selection Dialog */}
+      {/* File Selection Dialog */}
       <Dialog open={showFileSendDialog} onOpenChange={setShowFileSendDialog}>
-        <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>שלח קבצים נבחרים</DialogTitle>
+            <DialogTitle className="text-xl">שלח קבצים נבחרים</DialogTitle>
             <DialogDescription>
-              בחר קטגוריה ולאחר מכן סמן את הקבצים שברצונך לשלוח ל-{sendingRequest?.email}
+              בחר קטגוריה וסמן את הקבצים שברצונך לשלוח
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            {/* Request Info */}
+          <div className="space-y-5 py-4">
+            {/* Request Info Card */}
             {sendingRequest && (
-              <div className="bg-muted p-3 rounded-lg text-sm space-y-2">
-                <div>
-                  <strong>מייל:</strong> {sendingRequest.email}
+              <div className="bg-gradient-to-br from-muted/50 to-muted rounded-xl p-4 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm truncate">{sendingRequest.email}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm">{sendingRequest.id_number}</span>
+                  </div>
                 </div>
-                <div>
-                  <strong>תעודת זהות:</strong> {sendingRequest.id_number}
-                </div>
-                <div>
-                  <strong>קורס מבוקש:</strong> {sendingRequest.course_name}
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium">{sendingRequest.course_name}</span>
                 </div>
                 {sendingRequest.notes && (
-                  <div className="pt-2 border-t border-border">
-                    <strong>הערות:</strong>
-                    <p className="mt-1 text-muted-foreground whitespace-pre-wrap">{sendingRequest.notes}</p>
+                  <div className="pt-3 border-t border-border/50">
+                    <div className="flex items-start gap-2">
+                      <MessageSquare className="w-4 h-4 text-amber-500 mt-0.5" />
+                      <p className="text-sm whitespace-pre-wrap">{sendingRequest.notes}</p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -649,13 +700,16 @@ export const FileRequestsManager = () => {
                   setSelectedFileIds(new Set());
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-11">
                   <SelectValue placeholder="בחר קטגוריה..." />
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((category) => (
                     <SelectItem key={category.name} value={category.name}>
-                      {category.name} ({category.count} קבצים)
+                      <div className="flex items-center justify-between w-full gap-4">
+                        <span>{category.name}</span>
+                        <Badge variant="secondary" className="text-xs">{category.count} קבצים</Badge>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -664,10 +718,11 @@ export const FileRequestsManager = () => {
 
             {/* File List */}
             {selectedFilesDialogCategory && (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium">
-                    קבצים בקטגוריה ({filteredTemplatesForDialog.length})
+                    קבצים בקטגוריה
+                    <Badge variant="outline" className="mr-2">{filteredTemplatesForDialog.length}</Badge>
                   </label>
                   <Button
                     variant="outline"
@@ -677,26 +732,31 @@ export const FileRequestsManager = () => {
                     {selectedFileIds.size === filteredTemplatesForDialog.length ? "בטל הכל" : "בחר הכל"}
                   </Button>
                 </div>
-                <div className="border rounded-lg max-h-[250px] overflow-y-auto">
+                <div className="border rounded-xl max-h-[280px] overflow-y-auto divide-y">
                   {filteredTemplatesForDialog.length === 0 ? (
-                    <div className="p-4 text-center text-muted-foreground">
-                      אין קבצים בקטגוריה זו
+                    <div className="p-6 text-center text-muted-foreground">
+                      <FileText className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                      <p>אין קבצים בקטגוריה זו</p>
                     </div>
                   ) : (
                     filteredTemplatesForDialog.map((template) => (
                       <div
                         key={template.id}
                         className={cn(
-                          "flex items-center gap-3 p-3 border-b last:border-b-0 cursor-pointer hover:bg-muted/50 transition-colors",
-                          selectedFileIds.has(template.id) && "bg-primary/10"
+                          "flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/50 transition-all",
+                          selectedFileIds.has(template.id) && "bg-primary/5 hover:bg-primary/10"
                         )}
                         onClick={() => handleToggleFileSelection(template.id)}
                       >
                         <Checkbox
                           checked={selectedFileIds.has(template.id)}
                           onCheckedChange={() => handleToggleFileSelection(template.id)}
+                          className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                         />
-                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <FileText className={cn(
+                          "w-4 h-4",
+                          selectedFileIds.has(template.id) ? "text-primary" : "text-muted-foreground"
+                        )} />
                         <span className="flex-1 text-sm">{template.name}</span>
                         {selectedFileIds.has(template.id) && (
                           <Check className="w-4 h-4 text-primary" />
@@ -706,15 +766,15 @@ export const FileRequestsManager = () => {
                   )}
                 </div>
                 {selectedFileIds.size > 0 && (
-                  <div className="text-sm text-muted-foreground">
-                    נבחרו {selectedFileIds.size} קבצים
-                  </div>
+                  <p className="text-sm text-primary font-medium">
+                    ✓ נבחרו {selectedFileIds.size} קבצים
+                  </p>
                 )}
               </div>
             )}
 
             {/* Actions */}
-            <div className="flex gap-2 justify-end pt-4 border-t">
+            <div className="flex gap-3 justify-end pt-4 border-t">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -730,375 +790,521 @@ export const FileRequestsManager = () => {
               <Button
                 onClick={handleSendSelectedFiles}
                 disabled={selectedFileIds.size === 0 || isSendingFiles}
+                className="min-w-[140px]"
               >
-                {isSendingFiles ? "מעבד ושולח..." : `שלח ${selectedFileIds.size} קבצים`}
+                {isSendingFiles ? (
+                  <span className="flex items-center gap-2">
+                    <span className="animate-spin">⏳</span>
+                    מעבד...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <Send className="w-4 h-4" />
+                    שלח {selectedFileIds.size > 0 ? `${selectedFileIds.size} קבצים` : ""}
+                  </span>
+                )}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      <Card className="p-4 md:p-6">
-          <div className="space-y-4">
-            {/* Header - Mobile optimized */}
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-lg md:text-xl font-semibold text-foreground">בקשות לקבצים</h3>
-                <Badge variant="outline" className="text-xs md:text-sm">
-                  {filteredRequests.length === requests.length 
-                    ? `${requests.length} בקשות` 
-                    : `${filteredRequests.length} מתוך ${requests.length}`}
-                </Badge>
-              </div>
-              
-              {userFilter && (
-                <div className="flex items-center gap-2 bg-primary/10 text-primary px-3 py-1.5 rounded-full w-fit">
-                  <Users className="w-4 h-4" />
-                  <span className="text-sm font-medium truncate max-w-[200px]">
-                    מציג בקשות של: {userFilter.value}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearUserFilter}
-                    className="h-5 w-5 p-0 hover:bg-primary/20"
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              )}
-              
-              {/* Filters - Responsive grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+      {/* Main Content */}
+      <div className="space-y-4">
+        {/* Header with Stats */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-foreground">בקשות לקבצים</h2>
+            <p className="text-sm text-muted-foreground mt-1">ניהול ושליחת בקשות קבצים</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 px-3 py-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+              <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <span className="text-sm font-medium text-amber-700 dark:text-amber-300">{pendingCount} ממתינות</span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+              <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+              <span className="text-sm font-medium text-green-700 dark:text-green-300">{sentCount} טופלו</span>
+            </div>
+          </div>
+        </div>
+
+        {/* User Filter Banner */}
+        {userFilter && (
+          <div className="flex items-center gap-3 bg-primary/10 border border-primary/20 text-primary px-4 py-3 rounded-xl">
+            <Users className="w-5 h-5" />
+            <span className="font-medium">מציג בקשות של:</span>
+            <span className="truncate max-w-[250px]">{userFilter.value}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearUserFilter}
+              className="mr-auto h-8 hover:bg-primary/20"
+            >
+              <X className="h-4 w-4 ml-1" />
+              נקה סינון
+            </Button>
+          </div>
+        )}
+
+        {/* Search and Filters Card */}
+        <Card className="overflow-hidden">
+          <CardContent className="p-4 space-y-4">
+            {/* Search Bar */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="חיפוש..."
-                  className="w-full"
+                  placeholder="חיפוש לפי מייל, ת.ז או קורס..."
+                  className="pr-4 h-11"
                 />
-                <select
-                  value={courseFilter}
-                  onChange={(e) => setCourseFilter(e.target.value)}
-                  className="px-3 py-2 border rounded-lg bg-background text-sm w-full"
-                >
-                  <option value="all">כל הקורסים</option>
-                  {courses.map((course) => (
-                    <option key={course.id} value={course.name}>{course.name}</option>
-                  ))}
-                </select>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as any)}
-                  className="px-3 py-2 border rounded-lg bg-background text-sm w-full"
-                >
-                  <option value="all">כל הסטטוסים</option>
-                  <option value="pending">לא טופל</option>
-                  <option value="sent">טופל</option>
-                </select>
+              </div>
+              <div className="flex gap-2">
+                <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+                  <SelectTrigger className="w-[130px] h-11">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">כל הסטטוסים</SelectItem>
+                    <SelectItem value="pending">ממתין</SelectItem>
+                    <SelectItem value="sent">טופל</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={courseFilter} onValueChange={setCourseFilter}>
+                  <SelectTrigger className="w-[160px] h-11">
+                    <SelectValue placeholder="כל הקורסים" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">כל הקורסים</SelectItem>
+                    {courses.map((course) => (
+                      <SelectItem key={course.id} value={course.name}>{course.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            {/* Date Filters */}
-            <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/50 rounded-lg">
-              <span className="text-sm font-medium">סינון לפי תאריך:</span>
-              
-              <select
-                value={quickFilter}
-                onChange={(e) => handleQuickFilter(e.target.value)}
-                className="px-3 py-1.5 border rounded-lg bg-background text-sm"
-              >
-                <option value="all">כל התאריכים</option>
-                <option value="today">היום</option>
-                <option value="week">שבוע אחרון</option>
-                <option value="month">חודש אחרון</option>
-              </select>
-
-              <span className="text-sm text-muted-foreground">או בחר טווח:</span>
-
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={cn(
-                      "justify-start text-right font-normal",
-                      !startDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="ml-2 h-4 w-4" />
-                    {startDate ? format(startDate, "PPP") : "מתאריך"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={startDate}
-                    onSelect={(date) => {
-                      setStartDate(date);
-                      setQuickFilter("all");
-                    }}
-                    initialFocus
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
-
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={cn(
-                      "justify-start text-right font-normal",
-                      !endDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="ml-2 h-4 w-4" />
-                    {endDate ? format(endDate, "PPP") : "עד תאריך"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={endDate}
-                    onSelect={(date) => {
-                      setEndDate(date);
-                      setQuickFilter("all");
-                    }}
-                    initialFocus
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
-
-              {(startDate || endDate) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearDateFilters}
-                  className="h-8 px-2"
-                >
-                  <X className="h-4 w-4" />
-                  נקה
+            {/* Advanced Filters - Collapsible on mobile */}
+            <Collapsible open={isFiltersOpen} onOpenChange={setIsFiltersOpen}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="w-full sm:hidden flex items-center justify-between h-10 px-3 bg-muted/50 rounded-lg">
+                  <span className="flex items-center gap-2">
+                    <Filter className="w-4 h-4" />
+                    סינון לפי תאריך
+                  </span>
+                  <ChevronDown className={cn("w-4 h-4 transition-transform", isFiltersOpen && "rotate-180")} />
                 </Button>
-              )}
-            </div>
+              </CollapsibleTrigger>
+              
+              <div className="hidden sm:block">
+                <DateFilters
+                  quickFilter={quickFilter}
+                  handleQuickFilter={handleQuickFilter}
+                  startDate={startDate}
+                  setStartDate={setStartDate}
+                  endDate={endDate}
+                  setEndDate={setEndDate}
+                  setQuickFilter={setQuickFilter}
+                  clearDateFilters={clearDateFilters}
+                />
+              </div>
+              
+              <CollapsibleContent className="sm:hidden pt-3">
+                <DateFilters
+                  quickFilter={quickFilter}
+                  handleQuickFilter={handleQuickFilter}
+                  startDate={startDate}
+                  setStartDate={setStartDate}
+                  endDate={endDate}
+                  setEndDate={setEndDate}
+                  setQuickFilter={setQuickFilter}
+                  clearDateFilters={clearDateFilters}
+                />
+              </CollapsibleContent>
+            </Collapsible>
 
-          {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">טוען...</div>
-          ) : filteredRequests.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>אין בקשות במערכת</p>
+            {/* Results Count */}
+            <div className="flex items-center justify-between pt-2 border-t">
+              <span className="text-sm text-muted-foreground">
+                {filteredRequests.length === requests.length 
+                  ? `סה"כ ${requests.length} בקשות` 
+                  : `מציג ${filteredRequests.length} מתוך ${requests.length} בקשות`}
+              </span>
             </div>
-          ) : (
-            <>
+          </CardContent>
+        </Card>
+
+        {/* Content */}
+        {isLoading ? (
+          <Card className="p-12">
+            <div className="flex flex-col items-center justify-center text-muted-foreground">
+              <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mb-4" />
+              <p>טוען בקשות...</p>
+            </div>
+          </Card>
+        ) : filteredRequests.length === 0 ? (
+          <Card className="p-12">
+            <div className="flex flex-col items-center justify-center text-muted-foreground">
+              <FileText className="w-16 h-16 mb-4 opacity-30" />
+              <p className="text-lg font-medium">אין בקשות להצגה</p>
+              <p className="text-sm mt-1">נסה לשנות את הסינון או לחפש משהו אחר</p>
+            </div>
+          </Card>
+        ) : (
+          <>
             {/* Desktop Table */}
-            <div className="hidden md:block rounded-lg border overflow-hidden">
+            <Card className="hidden lg:block overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="text-right font-semibold">מייל</TableHead>
-                    <TableHead className="text-right font-semibold">ת.ז</TableHead>
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableHead className="text-right font-semibold w-[250px]">פרטי קשר</TableHead>
                     <TableHead className="text-right font-semibold">קורס</TableHead>
-                    <TableHead className="text-right font-semibold">תאריך</TableHead>
-                    <TableHead className="text-right font-semibold">סטטוס</TableHead>
-                    <TableHead className="text-right font-semibold">פעולות</TableHead>
+                    <TableHead className="text-right font-semibold w-[140px]">תאריך</TableHead>
+                    <TableHead className="text-right font-semibold w-[100px]">סטטוס</TableHead>
+                    <TableHead className="text-right font-semibold w-[220px]">פעולות</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredRequests.map((request) => (
-                    <TableRow key={request.id} className={cn(
-                      "hover:bg-muted/30 transition-colors",
-                      isRepeatUser(request) && "bg-amber-50 dark:bg-amber-950/20"
-                    )}>
-                      <TableCell className="font-medium py-3">
-                        <TooltipProvider>
+                    <TableRow 
+                      key={request.id} 
+                      className={cn(
+                        "group transition-colors",
+                        isRepeatUser(request) && "bg-amber-50/50 dark:bg-amber-950/10",
+                        request.status === "pending" && "border-r-4 border-r-amber-400"
+                      )}
+                    >
+                      <TableCell className="py-4">
+                        <div className="space-y-1.5">
                           <div className="flex items-center gap-2">
                             {isRepeatUser(request) && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-5 w-5 p-0 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/50 dark:hover:bg-amber-800/50 rounded-full flex-shrink-0"
-                                    onClick={() => handleFilterByUser(request, 'email')}
-                                  >
-                                    <span className="text-xs font-bold text-amber-700 dark:text-amber-300">
-                                      {getRepeatCount(request)}
-                                    </span>
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>משתמש חוזר - לחץ לצפייה בכל הבקשות</p>
-                                </TooltipContent>
-                              </Tooltip>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/50 dark:hover:bg-amber-800/50 rounded-full"
+                                      onClick={() => handleFilterByUser(request, 'email')}
+                                    >
+                                      <span className="text-xs font-bold text-amber-700 dark:text-amber-300">
+                                        {getRepeatCount(request)}
+                                      </span>
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>משתמש חוזר - לחץ לצפייה בכל הבקשות</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             )}
                             {request.notes && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Badge variant="outline" className="text-xs px-1.5 py-0.5 cursor-help">
-                                    📝
-                                  </Badge>
-                                </TooltipTrigger>
-                                <TooltipContent className="max-w-[300px]">
-                                  <p className="whitespace-pre-wrap">{request.notes}</p>
-                                </TooltipContent>
-                              </Tooltip>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge variant="outline" className="text-xs px-1.5 py-0.5 cursor-help bg-amber-50 border-amber-200 text-amber-700">
+                                      <MessageSquare className="w-3 h-3" />
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-[300px]">
+                                    <p className="whitespace-pre-wrap">{request.notes}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             )}
                             <button
                               onClick={() => handleFilterByUser(request, 'email')}
-                              className="hover:underline hover:text-primary transition-colors text-right text-sm truncate max-w-[180px]"
+                              className="hover:underline hover:text-primary transition-colors text-sm font-medium truncate max-w-[180px]"
                             >
                               {request.email}
                             </button>
                           </div>
-                        </TooltipProvider>
+                          <button
+                            onClick={() => handleFilterByUser(request, 'id_number')}
+                            className="text-xs text-muted-foreground hover:underline hover:text-primary transition-colors"
+                          >
+                            ת.ז: {request.id_number}
+                          </button>
+                        </div>
                       </TableCell>
-                      <TableCell className="py-3">
-                        <button
-                          onClick={() => handleFilterByUser(request, 'id_number')}
-                          className="hover:underline hover:text-primary transition-colors text-sm"
-                        >
-                          {request.id_number}
-                        </button>
+                      <TableCell className="py-4">
+                        <span className="text-sm font-medium">{request.course_name}</span>
                       </TableCell>
-                      <TableCell className="py-3 text-sm">{request.course_name}</TableCell>
-                      <TableCell className="py-3 text-sm text-muted-foreground">{formatDate(request.submission_date)}</TableCell>
-                      <TableCell className="py-3">
+                      <TableCell className="py-4">
+                        <span className="text-sm text-muted-foreground">{formatShortDate(request.submission_date)}</span>
+                      </TableCell>
+                      <TableCell className="py-4">
                         <Badge
                           variant={request.status === "sent" ? "default" : "secondary"}
-                          className="text-xs"
+                          className={cn(
+                            "text-xs font-medium",
+                            request.status === "pending" && "bg-amber-100 text-amber-700 hover:bg-amber-100",
+                            request.status === "sent" && "bg-green-100 text-green-700 hover:bg-green-100"
+                          )}
                         >
-                          {request.status === "sent" ? "טופל" : "לא טופל"}
+                          {request.status === "sent" ? "✓ טופל" : "ממתין"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="py-3">
-                        <div className="flex items-center gap-1.5">
-                          <Button size="sm" className="h-8 text-xs" onClick={() => handleOpenFileSendDialog(request)}>
-                            <Send className="w-3 h-3 ml-1" />
-                            שלח
+                      <TableCell className="py-4">
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            size="sm" 
+                            className="h-9" 
+                            onClick={() => handleOpenFileSendDialog(request)}
+                          >
+                            <Send className="w-4 h-4 ml-1" />
+                            שלח קבצים
                           </Button>
                           <Button
                             size="sm"
-                            variant="secondary"
-                            className="h-8 text-xs"
+                            variant="outline"
+                            className="h-9"
                             onClick={() => {
                               setSelectedRequest(request);
-                              // Auto-select category based on course name
                               const matchingCategory = categories.find(c => c.name === request.course_name);
                               setSelectedCategory(matchingCategory ? matchingCategory.name : "");
                               setShowTemplateDialog(true);
                             }}
                           >
-                            <FileStack className="w-3 h-3 ml-1" />
+                            <FileStack className="w-4 h-4 ml-1" />
                             קטגוריה
                           </Button>
-                          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => toggleStatus(request)}>
-                            {request.status === "sent" ? "בטל" : "סמן"}
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className="h-9 px-3" 
+                            onClick={() => toggleStatus(request)}
+                          >
+                            {request.status === "sent" ? "בטל" : "סמן ✓"}
                           </Button>
                         </div>
                         {request.status === "sent" && request.sent_date && (
-                          <div className="text-xs text-muted-foreground mt-1">
-                            נשלח ב-{formatDate(request.sent_date)}
-                          </div>
+                          <p className="text-xs text-muted-foreground mt-1.5">
+                            נשלח: {formatShortDate(request.sent_date)}
+                          </p>
                         )}
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            </div>
+            </Card>
 
-            {/* Mobile Cards */}
-            <div className="md:hidden space-y-3">
+            {/* Mobile & Tablet Cards */}
+            <div className="lg:hidden space-y-3">
               {filteredRequests.map((request) => (
-                <div 
+                <Card 
                   key={request.id} 
                   className={cn(
-                    "border rounded-lg p-4 space-y-3",
-                    isRepeatUser(request) && "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"
+                    "overflow-hidden transition-all",
+                    isRepeatUser(request) && "border-amber-200 dark:border-amber-800",
+                    request.status === "pending" && "border-r-4 border-r-amber-400"
                   )}
                 >
-                  {/* Header with status and repeat indicator */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {isRepeatUser(request) && (
-                        <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300 text-xs">
-                          חוזר ({getRepeatCount(request)})
+                  <CardContent className="p-4 space-y-4">
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge
+                          variant={request.status === "sent" ? "default" : "secondary"}
+                          className={cn(
+                            "text-xs font-medium",
+                            request.status === "pending" && "bg-amber-100 text-amber-700",
+                            request.status === "sent" && "bg-green-100 text-green-700"
+                          )}
+                        >
+                          {request.status === "sent" ? "✓ טופל" : "ממתין"}
                         </Badge>
-                      )}
-                      <Badge
-                        variant={request.status === "sent" ? "default" : "secondary"}
-                        className="text-xs"
+                        {isRepeatUser(request) && (
+                          <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                            משתמש חוזר ({getRepeatCount(request)})
+                          </Badge>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {formatShortDate(request.submission_date)}
+                      </span>
+                    </div>
+
+                    {/* Content */}
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => handleFilterByUser(request, 'email')}
+                        className="text-sm font-medium hover:underline hover:text-primary transition-colors block truncate w-full text-right"
                       >
-                        {request.status === "sent" ? "טופל" : "לא טופל"}
-                      </Badge>
+                        {request.email}
+                      </button>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">ת.ז: {request.id_number}</span>
+                        <Badge variant="outline" className="text-xs">{request.course_name}</Badge>
+                      </div>
                     </div>
-                    <span className="text-xs text-muted-foreground">{formatDate(request.submission_date)}</span>
-                  </div>
 
-                  {/* Contact info */}
-                  <div className="space-y-1">
-                    <button
-                      onClick={() => handleFilterByUser(request, 'email')}
-                      className="text-sm font-medium hover:underline hover:text-primary transition-colors block truncate w-full text-right"
-                    >
-                      {request.email}
-                    </button>
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span>ת.ז: {request.id_number}</span>
-                      <span>{request.course_name}</span>
+                    {/* Notes */}
+                    {request.notes && (
+                      <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3 text-sm">
+                        <div className="flex items-start gap-2">
+                          <MessageSquare className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                          <p className="text-amber-800 dark:text-amber-200 whitespace-pre-wrap">{request.notes}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    <div className="flex gap-2 pt-3 border-t">
+                      <Button 
+                        size="sm" 
+                        className="flex-1 h-10" 
+                        onClick={() => handleOpenFileSendDialog(request)}
+                      >
+                        <Send className="w-4 h-4 ml-1" />
+                        שלח קבצים
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 h-10"
+                        onClick={() => {
+                          setSelectedRequest(request);
+                          const matchingCategory = categories.find(c => c.name === request.course_name);
+                          setSelectedCategory(matchingCategory ? matchingCategory.name : "");
+                          setShowTemplateDialog(true);
+                        }}
+                      >
+                        <FileStack className="w-4 h-4 ml-1" />
+                        קטגוריה
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="h-10 px-4" 
+                        onClick={() => toggleStatus(request)}
+                      >
+                        {request.status === "sent" ? "בטל" : "✓"}
+                      </Button>
                     </div>
-                  </div>
 
-                  {/* Notes */}
-                  {request.notes && (
-                    <div className="bg-muted/50 rounded p-2 text-sm">
-                      <span className="font-medium">הערות: </span>
-                      <span className="text-muted-foreground">{request.notes}</span>
-                    </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className="flex gap-2 pt-2 border-t">
-                    <Button size="sm" className="flex-1 h-9" onClick={() => handleOpenFileSendDialog(request)}>
-                      <Send className="w-4 h-4 ml-1" />
-                      שלח קבצים
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="flex-1 h-9"
-                      onClick={() => {
-                        setSelectedRequest(request);
-                        // Auto-select category based on course name
-                        const matchingCategory = categories.find(c => c.name === request.course_name);
-                        setSelectedCategory(matchingCategory ? matchingCategory.name : "");
-                        setShowTemplateDialog(true);
-                      }}
-                    >
-                      <FileStack className="w-4 h-4 ml-1" />
-                      קטגוריה
-                    </Button>
-                    <Button size="sm" variant="outline" className="h-9 px-3" onClick={() => toggleStatus(request)}>
-                      {request.status === "sent" ? "בטל" : "✓"}
-                    </Button>
-                  </div>
-
-                  {request.status === "sent" && request.sent_date && (
-                    <div className="text-xs text-muted-foreground text-center">
-                      נשלח ב-{formatDate(request.sent_date)}
-                    </div>
-                  )}
-                </div>
+                    {request.status === "sent" && request.sent_date && (
+                      <p className="text-xs text-muted-foreground text-center pt-1">
+                        נשלח: {formatShortDate(request.sent_date)}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
               ))}
             </div>
-            </>
-          )}
-        </div>
-      </Card>
-
+          </>
+        )}
+      </div>
     </>
   );
 };
+
+// Date Filters Component
+interface DateFiltersProps {
+  quickFilter: string;
+  handleQuickFilter: (value: string) => void;
+  startDate: Date | undefined;
+  setStartDate: (date: Date | undefined) => void;
+  endDate: Date | undefined;
+  setEndDate: (date: Date | undefined) => void;
+  setQuickFilter: (value: string) => void;
+  clearDateFilters: () => void;
+}
+
+const DateFilters = ({
+  quickFilter,
+  handleQuickFilter,
+  startDate,
+  setStartDate,
+  endDate,
+  setEndDate,
+  setQuickFilter,
+  clearDateFilters,
+}: DateFiltersProps) => (
+  <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/30 rounded-lg">
+    <CalendarIcon className="w-4 h-4 text-muted-foreground" />
+    <Select value={quickFilter} onValueChange={handleQuickFilter}>
+      <SelectTrigger className="w-[130px] h-9 bg-background">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">כל התאריכים</SelectItem>
+        <SelectItem value="today">היום</SelectItem>
+        <SelectItem value="week">שבוע אחרון</SelectItem>
+        <SelectItem value="month">חודש אחרון</SelectItem>
+      </SelectContent>
+    </Select>
+
+    <span className="text-sm text-muted-foreground hidden sm:inline">או טווח מותאם:</span>
+
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn(
+            "h-9 justify-start text-right font-normal bg-background",
+            !startDate && "text-muted-foreground"
+          )}
+        >
+          <CalendarIcon className="ml-2 h-4 w-4" />
+          {startDate ? format(startDate, "dd/MM/yy") : "מתאריך"}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={startDate}
+          onSelect={(date) => {
+            setStartDate(date);
+            setQuickFilter("all");
+          }}
+          initialFocus
+          className="p-3 pointer-events-auto"
+        />
+      </PopoverContent>
+    </Popover>
+
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn(
+            "h-9 justify-start text-right font-normal bg-background",
+            !endDate && "text-muted-foreground"
+          )}
+        >
+          <CalendarIcon className="ml-2 h-4 w-4" />
+          {endDate ? format(endDate, "dd/MM/yy") : "עד תאריך"}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={endDate}
+          onSelect={(date) => {
+            setEndDate(date);
+            setQuickFilter("all");
+          }}
+          initialFocus
+          className="p-3 pointer-events-auto"
+        />
+      </PopoverContent>
+    </Popover>
+
+    {(startDate || endDate) && (
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={clearDateFilters}
+        className="h-9 px-2"
+      >
+        <X className="h-4 w-4 ml-1" />
+        נקה
+      </Button>
+    )}
+  </div>
+);
