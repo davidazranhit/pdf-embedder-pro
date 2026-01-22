@@ -101,19 +101,50 @@ const FileRequest = () => {
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase.from("file_requests").insert({
-        email,
-        id_number: idNumber,
-        course_name: courseName,
-        notes: notes.trim() || null,
-      });
+      // Insert the request
+      const { data: insertedRequest, error } = await supabase
+        .from("file_requests")
+        .insert({
+          email,
+          id_number: idNumber,
+          course_name: courseName,
+          notes: notes.trim() || null,
+        })
+        .select("id")
+        .single();
 
       if (error) throw error;
 
-      toast({
-        title: "בקשה נשלחה בהצלחה",
-        description: "הבקשה שלך התקבלה ותעבור לטיפול בהקדם",
-      });
+      // Check if this is a trusted combination and auto-send if so
+      try {
+        const { data: autoSendResult } = await supabase.functions.invoke("auto-send-trusted", {
+          body: {
+            email,
+            id_number: idNumber,
+            course_name: courseName,
+            request_id: insertedRequest.id,
+          },
+        });
+
+        if (autoSendResult?.trusted && autoSendResult?.sent) {
+          toast({
+            title: "הקבצים נשלחו אוטומטית! 🎉",
+            description: `${autoSendResult.fileCount} קבצים נשלחו למייל שלך`,
+          });
+        } else {
+          toast({
+            title: "בקשה נשלחה בהצלחה",
+            description: "הבקשה שלך התקבלה ותעבור לטיפול בהקדם",
+          });
+        }
+      } catch (autoSendError) {
+        console.error("Auto-send check failed:", autoSendError);
+        // Still show success - the request was saved
+        toast({
+          title: "בקשה נשלחה בהצלחה",
+          description: "הבקשה שלך התקבלה ותעבור לטיפול בהקדם",
+        });
+      }
 
       // Clear form
       setEmail("");

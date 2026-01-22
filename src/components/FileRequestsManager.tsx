@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Send, Filter, FileStack, Calendar as CalendarIcon, X, Users, ArrowLeft, Check, Mail, User, BookOpen, Clock, MessageSquare, ChevronDown } from "lucide-react";
+import { FileText, Send, Filter, FileStack, Calendar as CalendarIcon, X, Users, ArrowLeft, Check, Mail, User, BookOpen, Clock, MessageSquare, ChevronDown, ShieldCheck, Trash2 } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -78,6 +78,14 @@ interface Course {
   name: string;
 }
 
+interface TrustedCombination {
+  id: string;
+  email: string;
+  id_number: string;
+  course_name: string;
+  created_at: string;
+}
+
 export const FileRequestsManager = () => {
   const [requests, setRequests] = useState<FileRequest[]>([]);
   const [filteredRequests, setFilteredRequests] = useState<FileRequest[]>([]);
@@ -97,6 +105,8 @@ export const FileRequestsManager = () => {
   const [courseFilter, setCourseFilter] = useState<string>("all");
   const [courses, setCourses] = useState<Course[]>([]);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+  const [trustedCombinations, setTrustedCombinations] = useState<TrustedCombination[]>([]);
+  const [isMarkingTrusted, setIsMarkingTrusted] = useState(false);
   
   // New state for file selection dialog
   const [showFileSendDialog, setShowFileSendDialog] = useState(false);
@@ -145,6 +155,7 @@ export const FileRequestsManager = () => {
     fetchRequests();
     fetchTemplates();
     fetchCourses();
+    fetchTrustedCombinations();
   }, []);
 
   const fetchCourses = async () => {
@@ -157,6 +168,92 @@ export const FileRequestsManager = () => {
       console.error("Error fetching courses:", error);
     } else {
       setCourses(data || []);
+    }
+  };
+
+  const fetchTrustedCombinations = async () => {
+    const { data, error } = await supabase
+      .from("trusted_combinations")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching trusted combinations:", error);
+    } else {
+      setTrustedCombinations(data || []);
+    }
+  };
+
+  const isTrustedCombination = (request: FileRequest) => {
+    return trustedCombinations.some(
+      (tc) =>
+        tc.email === request.email &&
+        tc.id_number === request.id_number &&
+        tc.course_name === request.course_name
+    );
+  };
+
+  const handleMarkAsTrusted = async (request: FileRequest) => {
+    setIsMarkingTrusted(true);
+    try {
+      const { error } = await supabase.from("trusted_combinations").insert({
+        email: request.email,
+        id_number: request.id_number,
+        course_name: request.course_name,
+      });
+
+      if (error) {
+        if (error.code === "23505") {
+          toast({
+            title: "שילוב כבר קיים",
+            description: "השילוב הזה כבר מסומן כאמין",
+            variant: "destructive",
+          });
+        } else {
+          throw error;
+        }
+      } else {
+        toast({
+          title: "סומן כאמין ✓",
+          description: "בקשות עתידיות עם אותם פרטים יישלחו אוטומטית",
+        });
+        fetchTrustedCombinations();
+      }
+    } catch (error) {
+      console.error("Error marking as trusted:", error);
+      toast({
+        title: "שגיאה",
+        description: "לא ניתן לסמן כאמין",
+        variant: "destructive",
+      });
+    } finally {
+      setIsMarkingTrusted(false);
+    }
+  };
+
+  const handleRemoveTrusted = async (request: FileRequest) => {
+    try {
+      const { error } = await supabase
+        .from("trusted_combinations")
+        .delete()
+        .eq("email", request.email)
+        .eq("id_number", request.id_number)
+        .eq("course_name", request.course_name);
+
+      if (error) throw error;
+
+      toast({
+        title: "הוסר מאמינים",
+        description: "השילוב לא יישלח יותר אוטומטית",
+      });
+      fetchTrustedCombinations();
+    } catch (error) {
+      console.error("Error removing trusted:", error);
+      toast({
+        title: "שגיאה",
+        description: "לא ניתן להסיר מאמינים",
+        variant: "destructive",
+      });
     }
   };
 
@@ -1047,7 +1144,7 @@ export const FileRequestsManager = () => {
                         </Badge>
                       </TableCell>
                       <TableCell className="py-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Button 
                             size="sm" 
                             className="h-9" 
@@ -1070,6 +1167,44 @@ export const FileRequestsManager = () => {
                             <FileStack className="w-4 h-4 ml-1" />
                             קטגוריה
                           </Button>
+                          {isTrustedCombination(request) ? (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button 
+                                    size="sm" 
+                                    variant="ghost" 
+                                    className="h-9 px-2 text-green-600 hover:text-red-600 hover:bg-red-50"
+                                    onClick={() => handleRemoveTrusted(request)}
+                                  >
+                                    <ShieldCheck className="w-4 h-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>שילוב אמין - לחץ להסרה</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button 
+                                    size="sm" 
+                                    variant="ghost" 
+                                    className="h-9 px-2 hover:text-green-600 hover:bg-green-50"
+                                    onClick={() => handleMarkAsTrusted(request)}
+                                    disabled={isMarkingTrusted}
+                                  >
+                                    <ShieldCheck className="w-4 h-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>סמן כאמין - שליחה אוטומטית בעתיד</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
                           <Button 
                             size="sm" 
                             variant="ghost" 
@@ -1082,6 +1217,12 @@ export const FileRequestsManager = () => {
                         {request.status === "sent" && request.sent_date && (
                           <p className="text-xs text-muted-foreground mt-1.5">
                             נשלח: {formatShortDate(request.sent_date)}
+                          </p>
+                        )}
+                        {isTrustedCombination(request) && (
+                          <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                            <ShieldCheck className="w-3 h-3" />
+                            שילוב אמין
                           </p>
                         )}
                       </TableCell>
@@ -1175,6 +1316,26 @@ export const FileRequestsManager = () => {
                         <FileStack className="w-4 h-4 ml-1" />
                         קטגוריה
                       </Button>
+                      {isTrustedCombination(request) ? (
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-10 px-3 text-green-600 hover:text-red-600 hover:bg-red-50"
+                          onClick={() => handleRemoveTrusted(request)}
+                        >
+                          <ShieldCheck className="w-4 h-4" />
+                        </Button>
+                      ) : (
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-10 px-3 hover:text-green-600 hover:bg-green-50"
+                          onClick={() => handleMarkAsTrusted(request)}
+                          disabled={isMarkingTrusted}
+                        >
+                          <ShieldCheck className="w-4 h-4" />
+                        </Button>
+                      )}
                       <Button 
                         size="sm" 
                         variant="ghost" 
@@ -1184,6 +1345,13 @@ export const FileRequestsManager = () => {
                         {request.status === "sent" ? "בטל" : "✓"}
                       </Button>
                     </div>
+
+                    {isTrustedCombination(request) && (
+                      <p className="text-xs text-green-600 text-center pt-2 flex items-center justify-center gap-1">
+                        <ShieldCheck className="w-3 h-3" />
+                        שילוב אמין - שליחה אוטומטית
+                      </p>
+                    )}
 
                     {request.status === "sent" && request.sent_date && (
                       <p className="text-xs text-muted-foreground text-center pt-1">

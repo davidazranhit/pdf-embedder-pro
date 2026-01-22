@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.download-file]
 verify_jwt = false
+
+[functions.auto-send-trusted]
+verify_jwt = false

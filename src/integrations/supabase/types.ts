@@ -128,6 +128,33 @@ export type Database = {
         }
         Relationships: []
       }
+      trusted_combinations: {
+        Row: {
+          course_name: string
+          created_at: string
+          created_by: string | null
+          email: string
+          id: string
+          id_number: string
+        }
+        Insert: {
+          course_name: string
+          created_at?: string
+          created_by?: string | null
+          email: string
+          id?: string
+          id_number: string
+        }
+        Update: {
+          course_name?: string
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          id?: string
+          id_number?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
