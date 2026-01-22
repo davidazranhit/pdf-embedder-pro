@@ -1,0 +1,167 @@
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+interface CheckAndSendRequest {
+  email: string;
+  id_number: string;
+  course_name: string;
+  request_id: string;
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { email, id_number, course_name, request_id }: CheckAndSendRequest = await req.json();
+    console.log("Checking trusted combination for:", { email, id_number, course_name, request_id });
+
+    // Check if this combination is trusted
+    const { data: trustedData, error: trustedError } = await supabase
+      .from("trusted_combinations")
+      .select("id")
+      .eq("email", email)
+      .eq("id_number", id_number)
+      .eq("course_name", course_name)
+      .maybeSingle();
+
+    if (trustedError) {
+      console.error("Error checking trusted combinations:", trustedError);
+      return new Response(
+        JSON.stringify({ trusted: false, error: trustedError.message }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
+    }
+
+    if (!trustedData) {
+      console.log("Combination not trusted, manual processing required");
+      return new Response(
+        JSON.stringify({ trusted: false, sent: false }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
+    }
+
+    console.log("Trusted combination found! Auto-sending files...");
+
+    // Get all templates in the course category
+    const { data: templates, error: templatesError } = await supabase
+      .from("pdf_templates")
+      .select("file_path, name")
+      .eq("category", course_name);
+
+    if (templatesError || !templates || templates.length === 0) {
+      console.error("No templates found for course:", course_name);
+      return new Response(
+        JSON.stringify({ trusted: true, sent: false, error: "No templates found for course" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
+    }
+
+    console.log(`Found ${templates.length} templates for course ${course_name}`);
+
+    // Process watermarks
+    const fileIds = templates.map(t => t.file_path);
+    
+    const processResponse = await fetch(`${supabaseUrl}/functions/v1/process-watermark`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({
+        fileIds,
+        email,
+        userId: id_number,
+      }),
+    });
+
+    if (!processResponse.ok) {
+      const errorText = await processResponse.text();
+      console.error("Error processing watermarks:", errorText);
+      return new Response(
+        JSON.stringify({ trusted: true, sent: false, error: "Failed to process watermarks" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
+    }
+
+    const processData = await processResponse.json();
+    
+    if (!processData?.files || processData.files.length === 0) {
+      console.error("No files processed");
+      return new Response(
+        JSON.stringify({ trusted: true, sent: false, error: "No files processed" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
+    }
+
+    // Prepare files for sending
+    const processedFiles = processData.files.map((f: any) => ({
+      processedId: f.processedId,
+      originalName: f.originalName,
+    }));
+
+    // Send email with files
+    const sendResponse = await fetch(`${supabaseUrl}/functions/v1/send-watermarked-files`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({
+        email,
+        fileIds: processedFiles,
+      }),
+    });
+
+    if (!sendResponse.ok) {
+      const errorText = await sendResponse.text();
+      console.error("Error sending files:", errorText);
+      return new Response(
+        JSON.stringify({ trusted: true, sent: false, error: "Failed to send email" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
+    }
+
+    // Update request status to sent
+    const { error: updateError } = await supabase
+      .from("file_requests")
+      .update({
+        status: "sent",
+        sent_date: new Date().toISOString(),
+      })
+      .eq("id", request_id);
+
+    if (updateError) {
+      console.error("Error updating request status:", updateError);
+    }
+
+    console.log("Auto-send completed successfully!");
+
+    return new Response(
+      JSON.stringify({ 
+        trusted: true, 
+        sent: true, 
+        fileCount: processedFiles.length 
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+    );
+
+  } catch (error) {
+    console.error("Error in auto-send-trusted:", error);
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+    );
+  }
+});
