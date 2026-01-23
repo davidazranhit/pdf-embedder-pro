@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Send, Filter, Calendar as CalendarIcon, X, Users, Check, Mail, User, BookOpen, Clock, MessageSquare, ChevronDown, ShieldCheck } from "lucide-react";
+import { FileText, Send, Filter, Calendar as CalendarIcon, X, Users, Check, Mail, User, BookOpen, Clock, MessageSquare, ChevronDown, ShieldCheck, Eye } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -103,7 +103,7 @@ export const FileRequestsManager = () => {
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [trustedCombinations, setTrustedCombinations] = useState<TrustedCombination[]>([]);
   const [isMarkingTrusted, setIsMarkingTrusted] = useState(false);
-  
+  const [isFileListExpanded, setIsFileListExpanded] = useState(false);
   // New state for file selection dialog
   const [showFileSendDialog, setShowFileSendDialog] = useState(false);
   const [selectedFilesDialogCategory, setSelectedFilesDialogCategory] = useState<string>("");
@@ -402,8 +402,10 @@ export const FileRequestsManager = () => {
     } else {
       setSelectedFileIds(new Set());
     }
+    setIsFileListExpanded(false); // Start collapsed
     setShowFileSendDialog(true);
-  };
+
+
 
   const handleSendSelectedFiles = async () => {
     if (!sendingRequest || selectedFileIds.size === 0) return;
@@ -631,59 +633,80 @@ export const FileRequestsManager = () => {
               </Select>
             </div>
 
-            {/* File List */}
+            {/* File Summary & Selection */}
             {selectedFilesDialogCategory && (
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">
-                    קבצים בקטגוריה
-                    <Badge variant="outline" className="mr-2">{filteredTemplatesForDialog.length}</Badge>
-                  </label>
+                {/* Summary bar */}
+                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-medium">
+                      {selectedFileIds.size === filteredTemplatesForDialog.length 
+                        ? `כל ${filteredTemplatesForDialog.length} הקבצים נבחרו` 
+                        : `${selectedFileIds.size} מתוך ${filteredTemplatesForDialog.length} קבצים נבחרו`}
+                    </span>
+                  </div>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={handleSelectAllFiles}
+                    onClick={() => setIsFileListExpanded(!isFileListExpanded)}
+                    className="gap-1"
                   >
-                    {selectedFileIds.size === filteredTemplatesForDialog.length ? "בטל הכל" : "בחר הכל"}
+                    <Eye className="w-4 h-4" />
+                    {isFileListExpanded ? "הסתר קבצים" : "בחר קבצים ספציפיים"}
                   </Button>
                 </div>
-                <div className="border rounded-xl max-h-[280px] overflow-y-auto divide-y">
-                  {filteredTemplatesForDialog.length === 0 ? (
-                    <div className="p-6 text-center text-muted-foreground">
-                      <FileText className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                      <p>אין קבצים בקטגוריה זו</p>
-                    </div>
-                  ) : (
-                    filteredTemplatesForDialog.map((template) => (
-                      <div
-                        key={template.id}
-                        className={cn(
-                          "flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/50 transition-all",
-                          selectedFileIds.has(template.id) && "bg-primary/5 hover:bg-primary/10"
-                        )}
-                        onClick={() => handleToggleFileSelection(template.id)}
+
+                {/* Expandable file list */}
+                {isFileListExpanded && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-muted-foreground">
+                        רשימת קבצים
+                      </label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleSelectAllFiles}
+                        className="h-8 text-xs"
                       >
-                        <Checkbox
-                          checked={selectedFileIds.has(template.id)}
-                          onCheckedChange={() => handleToggleFileSelection(template.id)}
-                          className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                        />
-                        <FileText className={cn(
-                          "w-4 h-4",
-                          selectedFileIds.has(template.id) ? "text-primary" : "text-muted-foreground"
-                        )} />
-                        <span className="flex-1 text-sm">{template.name}</span>
-                        {selectedFileIds.has(template.id) && (
-                          <Check className="w-4 h-4 text-primary" />
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
-                {selectedFileIds.size > 0 && (
-                  <p className="text-sm text-primary font-medium">
-                    ✓ נבחרו {selectedFileIds.size} קבצים
-                  </p>
+                        {selectedFileIds.size === filteredTemplatesForDialog.length ? "בטל הכל" : "בחר הכל"}
+                      </Button>
+                    </div>
+                    <div className="border rounded-xl max-h-[200px] overflow-y-auto divide-y bg-background">
+                      {filteredTemplatesForDialog.length === 0 ? (
+                        <div className="p-6 text-center text-muted-foreground">
+                          <FileText className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                          <p>אין קבצים בקטגוריה זו</p>
+                        </div>
+                      ) : (
+                        filteredTemplatesForDialog.map((template) => (
+                          <div
+                            key={template.id}
+                            className={cn(
+                              "flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/50 transition-all",
+                              selectedFileIds.has(template.id) && "bg-primary/5 hover:bg-primary/10"
+                            )}
+                            onClick={() => handleToggleFileSelection(template.id)}
+                          >
+                            <Checkbox
+                              checked={selectedFileIds.has(template.id)}
+                              onCheckedChange={() => handleToggleFileSelection(template.id)}
+                              className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                            />
+                            <FileText className={cn(
+                              "w-4 h-4",
+                              selectedFileIds.has(template.id) ? "text-primary" : "text-muted-foreground"
+                            )} />
+                            <span className="flex-1 text-sm truncate">{template.name}</span>
+                            {selectedFileIds.has(template.id) && (
+                              <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
             )}
@@ -873,11 +896,11 @@ export const FileRequestsManager = () => {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/30 hover:bg-muted/30">
-                    <TableHead className="text-right font-semibold w-[250px]">פרטי קשר</TableHead>
-                    <TableHead className="text-right font-semibold">קורס</TableHead>
-                    <TableHead className="text-right font-semibold w-[140px]">תאריך</TableHead>
-                    <TableHead className="text-right font-semibold w-[100px]">סטטוס</TableHead>
-                    <TableHead className="text-right font-semibold w-[220px]">פעולות</TableHead>
+                    <TableHead className="text-right font-semibold min-w-[280px]">פרטי קשר</TableHead>
+                    <TableHead className="text-right font-semibold min-w-[120px]">קורס</TableHead>
+                    <TableHead className="text-right font-semibold w-[130px]">תאריך</TableHead>
+                    <TableHead className="text-right font-semibold w-[90px]">סטטוס</TableHead>
+                    <TableHead className="text-right font-semibold w-[180px]">פעולות</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -928,12 +951,21 @@ export const FileRequestsManager = () => {
                                 </Tooltip>
                               </TooltipProvider>
                             )}
-                            <button
-                              onClick={() => handleFilterByUser(request, 'email')}
-                              className="hover:underline hover:text-primary transition-colors text-sm font-medium truncate max-w-[180px]"
-                            >
-                              {request.email}
-                            </button>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    onClick={() => handleFilterByUser(request, 'email')}
+                                    className="hover:underline hover:text-primary transition-colors text-sm font-medium truncate max-w-[200px] text-right"
+                                  >
+                                    {request.email}
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{request.email}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
                           <button
                             onClick={() => handleFilterByUser(request, 'id_number')}
@@ -1266,3 +1298,4 @@ const DateFilters = ({
     )}
   </div>
 );
+
