@@ -50,7 +50,7 @@ serve(async (req) => {
     if (!fileExists) {
       console.log("File not found or already downloaded:", filePath);
       return new Response(
-        JSON.stringify({ error: "עליך להגיש בקשה חדשה כדי לקבל את הקבצים" }),
+        JSON.stringify({ error: "הקבצים נמחקים אוטומטית מהשרת אחרי הורדה או אחרי 3 ימים, עליך להגיש בקשה נוספת כדי לקבל את הקבצים מחדש" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 }
       );
     }
