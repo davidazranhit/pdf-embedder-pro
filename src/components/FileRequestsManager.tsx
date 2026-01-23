@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Send, Filter, FileStack, Calendar as CalendarIcon, X, Users, ArrowLeft, Check, Mail, User, BookOpen, Clock, MessageSquare, ChevronDown, ShieldCheck, Trash2 } from "lucide-react";
+import { FileText, Send, Filter, Calendar as CalendarIcon, X, Users, Check, Mail, User, BookOpen, Clock, MessageSquare, ChevronDown, ShieldCheck } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -92,12 +92,8 @@ export const FileRequestsManager = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "sent">("all");
   const [search, setSearch] = useState("");
-  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
-  const [selectedRequest, setSelectedRequest] = useState<FileRequest | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [isSending, setIsSending] = useState(false);
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [quickFilter, setQuickFilter] = useState<string>("all");
@@ -367,103 +363,6 @@ export const FileRequestsManager = () => {
     toast({ title: "עודכן", description: newStatus === "sent" ? "סומן כטופל" : "סומן כלא טופל" });
   };
 
-  const handleSendFromCategory = async () => {
-    if (!selectedRequest || !selectedCategory) return;
-
-    setIsSending(true);
-    try {
-      // Get all templates in the selected category
-      const categoryTemplates = templates.filter((t) => t.category === selectedCategory);
-      
-      if (categoryTemplates.length === 0) {
-        toast({ title: "שגיאה", description: "לא נמצאו קבצים בקטגוריה זו", variant: "destructive" });
-        return;
-      }
-
-      toast({
-        title: "מעבד קבצים",
-        description: `מעבד ${categoryTemplates.length} קבצים...`,
-      });
-
-      // Collect all file paths from the category
-      const allFileIds = categoryTemplates.map((template) => template.file_path);
-
-      // Process watermarks for all files at once (same as in Index.tsx)
-      const { data: processData, error: processError } = await supabase.functions.invoke(
-        "process-watermark",
-        {
-          body: {
-            fileIds: allFileIds,
-            email: selectedRequest.email,
-            userId: selectedRequest.id_number,
-          },
-        }
-      );
-
-      if (processError || !processData?.files || processData.files.length === 0) {
-        console.error("Error processing watermarks:", processError);
-        toast({
-          title: "שגיאה",
-          description: "לא הצלחנו לעבד את הקבצים",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Extract processed file info with original names
-      const processedFiles = processData.files.map((f: any) => ({
-        processedId: f.processedId,
-        originalName: f.originalName
-      }));
-
-      // Send email with all processed files (including original names)
-      const { error: sendError } = await supabase.functions.invoke("send-watermarked-files", {
-        body: {
-          email: selectedRequest.email,
-          fileIds: processedFiles,
-        },
-      });
-
-      if (sendError) {
-        console.error("Error sending email:", sendError);
-        toast({
-          title: "שגיאה",
-          description: "שגיאה בשליחת המייל",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Update request status
-      await supabase
-        .from("file_requests")
-        .update({
-          status: "sent",
-          sent_date: new Date().toISOString(),
-        })
-        .eq("id", selectedRequest.id);
-
-      toast({
-        title: "הצלחה",
-        description: `${processedFiles.length} קבצים נשלחו בהצלחה`,
-      });
-
-      setShowTemplateDialog(false);
-      setSelectedRequest(null);
-      setSelectedCategory("");
-      fetchRequests();
-    } catch (error) {
-      console.error("Error in handleSendFromCategory:", error);
-      toast({
-        title: "שגיאה",
-        description: "שגיאה כללית בתהליך השליחה",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSending(false);
-    }
-  };
-
   // Get templates filtered by selected category
   const filteredTemplatesForDialog = selectedFilesDialogCategory 
     ? templates.filter((t) => t.category === selectedFilesDialogCategory)
@@ -493,8 +392,16 @@ export const FileRequestsManager = () => {
     setSendingRequest(request);
     // Auto-select category based on course name if matching category exists
     const matchingCategory = categories.find(c => c.name === request.course_name);
-    setSelectedFilesDialogCategory(matchingCategory ? matchingCategory.name : "");
-    setSelectedFileIds(new Set());
+    const categoryName = matchingCategory ? matchingCategory.name : "";
+    setSelectedFilesDialogCategory(categoryName);
+    
+    // Auto-select all files in the matching category
+    if (categoryName) {
+      const categoryTemplates = templates.filter((t) => t.category === categoryName);
+      setSelectedFileIds(new Set(categoryTemplates.map((t) => t.id)));
+    } else {
+      setSelectedFileIds(new Set());
+    }
     setShowFileSendDialog(true);
   };
 
@@ -658,97 +565,6 @@ export const FileRequestsManager = () => {
 
   return (
     <>
-      {/* Send Category Dialog */}
-      <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="text-xl">שלח קבצים מקטגוריה</DialogTitle>
-            <DialogDescription>
-              בחר קטגוריה לשליחת כל הקבצים שלה
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            {/* Request Info Card */}
-            {selectedRequest && (
-              <div className="bg-gradient-to-br from-muted/50 to-muted rounded-xl p-4 space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm truncate">{selectedRequest.email}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <User className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm">{selectedRequest.id_number}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">{selectedRequest.course_name}</span>
-                </div>
-                {selectedRequest.notes && (
-                  <div className="pt-3 border-t border-border/50">
-                    <div className="flex items-start gap-2">
-                      <MessageSquare className="w-4 h-4 text-muted-foreground mt-0.5" />
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedRequest.notes}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium">בחר קטגוריה</label>
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="h-11">
-                  <SelectValue placeholder="בחר קטגוריה..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category.name} value={category.name}>
-                      <div className="flex items-center justify-between w-full gap-4">
-                        <span>{category.name}</span>
-                        <Badge variant="secondary" className="text-xs">{category.count} קבצים</Badge>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="flex gap-3 justify-end pt-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowTemplateDialog(false);
-                  setSelectedRequest(null);
-                  setSelectedCategory("");
-                }}
-                disabled={isSending}
-              >
-                ביטול
-              </Button>
-              <Button
-                onClick={handleSendFromCategory}
-                disabled={!selectedCategory || isSending}
-                className="min-w-[120px]"
-              >
-                {isSending ? (
-                  <span className="flex items-center gap-2">
-                    <span className="animate-spin">⏳</span>
-                    מעבד...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <Send className="w-4 h-4" />
-                    שלח קבצים
-                  </span>
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* File Selection Dialog */}
       <Dialog open={showFileSendDialog} onOpenChange={setShowFileSendDialog}>
         <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
@@ -794,7 +610,9 @@ export const FileRequestsManager = () => {
                 value={selectedFilesDialogCategory} 
                 onValueChange={(value) => {
                   setSelectedFilesDialogCategory(value);
-                  setSelectedFileIds(new Set());
+                  // Auto-select all files when category changes
+                  const categoryTemplates = templates.filter((t) => t.category === value);
+                  setSelectedFileIds(new Set(categoryTemplates.map((t) => t.id)));
                 }}
               >
                 <SelectTrigger className="h-11">
@@ -1153,20 +971,6 @@ export const FileRequestsManager = () => {
                             <Send className="w-4 h-4 ml-1" />
                             שלח קבצים
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-9"
-                            onClick={() => {
-                              setSelectedRequest(request);
-                              const matchingCategory = categories.find(c => c.name === request.course_name);
-                              setSelectedCategory(matchingCategory ? matchingCategory.name : "");
-                              setShowTemplateDialog(true);
-                            }}
-                          >
-                            <FileStack className="w-4 h-4 ml-1" />
-                            קטגוריה
-                          </Button>
                           {isTrustedCombination(request) ? (
                             <TooltipProvider>
                               <Tooltip>
@@ -1301,20 +1105,6 @@ export const FileRequestsManager = () => {
                       >
                         <Send className="w-4 h-4 ml-1" />
                         שלח קבצים
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 h-10"
-                        onClick={() => {
-                          setSelectedRequest(request);
-                          const matchingCategory = categories.find(c => c.name === request.course_name);
-                          setSelectedCategory(matchingCategory ? matchingCategory.name : "");
-                          setShowTemplateDialog(true);
-                        }}
-                      >
-                        <FileStack className="w-4 h-4 ml-1" />
-                        קטגוריה
                       </Button>
                       {isTrustedCombination(request) ? (
                         <Button 
