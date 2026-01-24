@@ -404,8 +404,7 @@ export const FileRequestsManager = () => {
     }
     setIsFileListExpanded(false); // Start collapsed
     setShowFileSendDialog(true);
-
-
+  };
 
   const handleSendSelectedFiles = async () => {
     if (!sendingRequest || selectedFileIds.size === 0) return;
