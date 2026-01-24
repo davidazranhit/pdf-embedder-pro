@@ -950,21 +950,12 @@ export const FileRequestsManager = () => {
                                 </Tooltip>
                               </TooltipProvider>
                             )}
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <button
-                                    onClick={() => handleFilterByUser(request, 'email')}
-                                    className="hover:underline hover:text-primary transition-colors text-sm font-medium truncate max-w-[200px] text-right"
-                                  >
-                                    {request.email}
-                                  </button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>{request.email}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
+                            <button
+                              onClick={() => handleFilterByUser(request, 'email')}
+                              className="hover:underline hover:text-primary transition-colors text-sm font-medium text-right break-all"
+                            >
+                              {request.email}
+                            </button>
                           </div>
                           <button
                             onClick={() => handleFilterByUser(request, 'id_number')}
