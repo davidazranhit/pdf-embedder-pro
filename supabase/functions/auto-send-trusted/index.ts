@@ -121,6 +121,7 @@ serve(async (req) => {
       body: JSON.stringify({
         email,
         fileIds: processedFiles,
+        courseName: course_name,
       }),
     });
 

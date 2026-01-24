@@ -462,6 +462,7 @@ export const FileRequestsManager = () => {
         body: {
           email: sendingRequest.email,
           fileIds: processedFiles,
+          courseName: sendingRequest.course_name,
         },
       });
 

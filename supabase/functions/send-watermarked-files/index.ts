@@ -9,6 +9,7 @@ const corsHeaders = {
 interface SendEmailRequest {
   email: string;
   fileIds: string[];
+  courseName?: string;
 }
 
 serve(async (req) => {
@@ -31,8 +32,8 @@ serve(async (req) => {
       );
     }
 
-    const { email, fileIds }: SendEmailRequest = await req.json();
-    console.log("Sending files to:", email, "Files:", fileIds);
+    const { email, fileIds, courseName }: SendEmailRequest = await req.json();
+    console.log("Sending files to:", email, "Files:", fileIds, "Course:", courseName);
 
     // Load email template settings from database
     const { data: settings } = await supabase
@@ -41,7 +42,8 @@ serve(async (req) => {
       .eq('id', '00000000-0000-0000-0000-000000000001')
       .maybeSingle();
 
-    const emailSubject = settings?.email_subject ?? 'הקבצים המבוקשים שלך';
+    const baseSubject = settings?.email_subject ?? 'הקבצים המבוקשים שלך';
+    const emailSubject = courseName ? `${baseSubject} - ${courseName}` : baseSubject;
     const emailBodyText = settings?.email_body ?? `שלום,
 
 מצורפים הקבצים שלך לקורס.
