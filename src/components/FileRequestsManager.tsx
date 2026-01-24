@@ -103,6 +103,7 @@ export const FileRequestsManager = () => {
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [trustedCombinations, setTrustedCombinations] = useState<TrustedCombination[]>([]);
   const [isMarkingTrusted, setIsMarkingTrusted] = useState(false);
+  const [suspiciousFilter, setSuspiciousFilter] = useState(false);
   const [isFileListExpanded, setIsFileListExpanded] = useState(false);
   // New state for file selection dialog
   const [showFileSendDialog, setShowFileSendDialog] = useState(false);
@@ -335,8 +336,13 @@ export const FileRequestsManager = () => {
       base = base.filter((r) => new Date(r.submission_date) <= endOfDay);
     }
     
+    // Suspicious filter
+    if (suspiciousFilter) {
+      base = base.filter((r) => isSuspiciousRequest(r));
+    }
+    
     setFilteredRequests(base);
-  }, [statusFilter, requests, search, startDate, endDate, userFilter, courseFilter]);
+  }, [statusFilter, requests, search, startDate, endDate, userFilter, courseFilter, suspiciousFilter, userRequestCounts]);
 
   const fetchRequests = async () => {
     setIsLoading(true);
@@ -845,7 +851,7 @@ export const FileRequestsManager = () => {
                   className="pr-4 h-11"
                 />
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
                   <SelectTrigger className="w-[130px] h-11">
                     <SelectValue />
@@ -867,6 +873,14 @@ export const FileRequestsManager = () => {
                     ))}
                   </SelectContent>
                 </Select>
+                <Button
+                  variant={suspiciousFilter ? "destructive" : "outline"}
+                  size="default"
+                  className="h-11"
+                  onClick={() => setSuspiciousFilter(!suspiciousFilter)}
+                >
+                  ⚠️ חשודות בלבד
+                </Button>
               </div>
             </div>
 
