@@ -114,29 +114,76 @@ export const FileRequestsManager = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Calculate request counts per user (by email and id_number)
+  // Calculate request counts per user (by email and id_number) - case insensitive for email
   const userRequestCounts = useMemo(() => {
     const emailCounts = new Map<string, number>();
     const idCounts = new Map<string, number>();
+    // Track which IDs are associated with each email and vice versa
+    const emailToIds = new Map<string, Set<string>>();
+    const idToEmails = new Map<string, Set<string>>();
     
     requests.forEach((r) => {
-      emailCounts.set(r.email, (emailCounts.get(r.email) || 0) + 1);
+      const normalizedEmail = r.email.toLowerCase();
+      emailCounts.set(normalizedEmail, (emailCounts.get(normalizedEmail) || 0) + 1);
       idCounts.set(r.id_number, (idCounts.get(r.id_number) || 0) + 1);
+      
+      // Track email-to-ID associations
+      if (!emailToIds.has(normalizedEmail)) {
+        emailToIds.set(normalizedEmail, new Set());
+      }
+      emailToIds.get(normalizedEmail)!.add(r.id_number);
+      
+      // Track ID-to-email associations
+      if (!idToEmails.has(r.id_number)) {
+        idToEmails.set(r.id_number, new Set());
+      }
+      idToEmails.get(r.id_number)!.add(normalizedEmail);
     });
     
-    return { emailCounts, idCounts };
+    return { emailCounts, idCounts, emailToIds, idToEmails };
   }, [requests]);
 
   const isRepeatUser = (request: FileRequest) => {
-    const emailCount = userRequestCounts.emailCounts.get(request.email) || 0;
+    const normalizedEmail = request.email.toLowerCase();
+    const emailCount = userRequestCounts.emailCounts.get(normalizedEmail) || 0;
     const idCount = userRequestCounts.idCounts.get(request.id_number) || 0;
     return emailCount > 1 || idCount > 1;
   };
 
   const getRepeatCount = (request: FileRequest) => {
-    const emailCount = userRequestCounts.emailCounts.get(request.email) || 0;
+    const normalizedEmail = request.email.toLowerCase();
+    const emailCount = userRequestCounts.emailCounts.get(normalizedEmail) || 0;
     const idCount = userRequestCounts.idCounts.get(request.id_number) || 0;
     return Math.max(emailCount, idCount);
+  };
+
+  // Check if request is suspicious (same email with different ID or same ID with different email)
+  const isSuspiciousRequest = (request: FileRequest) => {
+    const normalizedEmail = request.email.toLowerCase();
+    const idsForEmail = userRequestCounts.emailToIds.get(normalizedEmail);
+    const emailsForId = userRequestCounts.idToEmails.get(request.id_number);
+    
+    // Suspicious if this email has been used with more than one ID
+    const emailHasMultipleIds = idsForEmail && idsForEmail.size > 1;
+    // Suspicious if this ID has been used with more than one email
+    const idHasMultipleEmails = emailsForId && emailsForId.size > 1;
+    
+    return emailHasMultipleIds || idHasMultipleEmails;
+  };
+
+  const getSuspiciousReason = (request: FileRequest): string => {
+    const normalizedEmail = request.email.toLowerCase();
+    const idsForEmail = userRequestCounts.emailToIds.get(normalizedEmail);
+    const emailsForId = userRequestCounts.idToEmails.get(request.id_number);
+    
+    const reasons: string[] = [];
+    if (idsForEmail && idsForEmail.size > 1) {
+      reasons.push(`מייל זה שימש עם ${idsForEmail.size} מספרי ת"ז שונים`);
+    }
+    if (emailsForId && emailsForId.size > 1) {
+      reasons.push(`ת"ז זו שימשה עם ${emailsForId.size} מיילים שונים`);
+    }
+    return reasons.join(' | ');
   };
 
   const handleFilterByUser = (request: FileRequest, type: 'email' | 'id_number') => {
@@ -183,7 +230,7 @@ export const FileRequestsManager = () => {
   const isTrustedCombination = (request: FileRequest) => {
     return trustedCombinations.some(
       (tc) =>
-        tc.email === request.email &&
+        tc.email.toLowerCase() === request.email.toLowerCase() &&
         tc.id_number === request.id_number &&
         tc.course_name === request.course_name
     );
@@ -256,11 +303,11 @@ export const FileRequestsManager = () => {
   useEffect(() => {
     let base = statusFilter === "all" ? requests : requests.filter((r) => r.status === statusFilter);
     
-    // User filter (by email or id_number)
+    // User filter (by email or id_number) - case insensitive for email
     if (userFilter) {
       base = base.filter((r) => 
         userFilter.type === 'email' 
-          ? r.email === userFilter.value 
+          ? r.email.toLowerCase() === userFilter.value.toLowerCase() 
           : r.id_number === userFilter.value
       );
     }
@@ -909,13 +956,31 @@ export const FileRequestsManager = () => {
                       key={request.id} 
                       className={cn(
                         "group transition-colors",
-                        isRepeatUser(request) && "bg-amber-50/50 dark:bg-amber-950/10",
+                        isSuspiciousRequest(request) && "bg-red-50/50 dark:bg-red-950/10",
+                        !isSuspiciousRequest(request) && isRepeatUser(request) && "bg-amber-50/50 dark:bg-amber-950/10",
                         request.status === "pending" && "border-r-4 border-r-amber-400"
                       )}
                     >
                       <TableCell className="py-4">
                         <div className="space-y-1.5">
                           <div className="flex items-center gap-2">
+                            {isSuspiciousRequest(request) && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge 
+                                      variant="destructive" 
+                                      className="text-xs px-1.5 py-0.5 cursor-help"
+                                    >
+                                      ⚠️ חשוד
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-[300px]">
+                                    <p>{getSuspiciousReason(request)}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
                             {isRepeatUser(request) && (
                               <TooltipProvider>
                                 <Tooltip>
@@ -1066,7 +1131,8 @@ export const FileRequestsManager = () => {
                   key={request.id} 
                   className={cn(
                     "overflow-hidden transition-all",
-                    isRepeatUser(request) && "border-amber-200 dark:border-amber-800",
+                    isSuspiciousRequest(request) && "border-red-300 dark:border-red-800",
+                    !isSuspiciousRequest(request) && isRepeatUser(request) && "border-amber-200 dark:border-amber-800",
                     request.status === "pending" && "border-r-4 border-r-amber-400"
                   )}
                 >
@@ -1084,6 +1150,11 @@ export const FileRequestsManager = () => {
                         >
                           {request.status === "sent" ? "✓ טופל" : "ממתין"}
                         </Badge>
+                        {isSuspiciousRequest(request) && (
+                          <Badge variant="destructive" className="text-xs">
+                            ⚠️ חשוד - {getSuspiciousReason(request)}
+                          </Badge>
+                        )}
                         {isRepeatUser(request) && (
                           <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
                             משתמש חוזר ({getRepeatCount(request)})
