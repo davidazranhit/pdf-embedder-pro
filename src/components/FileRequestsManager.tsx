@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Send, Filter, Calendar as CalendarIcon, X, Users, Check, Mail, User, BookOpen, Clock, MessageSquare, ChevronDown, ShieldCheck, Eye } from "lucide-react";
+import { FileText, Send, Filter, Calendar as CalendarIcon, X, Users, Check, Mail, User, BookOpen, Clock, MessageSquare, ChevronDown, ShieldCheck, Eye, AlertTriangle } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -86,6 +86,13 @@ interface TrustedCombination {
   created_at: string;
 }
 
+interface SuspiciousCombination {
+  id: string;
+  email: string;
+  id_number: string;
+  created_at: string;
+}
+
 export const FileRequestsManager = () => {
   const [requests, setRequests] = useState<FileRequest[]>([]);
   const [filteredRequests, setFilteredRequests] = useState<FileRequest[]>([]);
@@ -104,6 +111,8 @@ export const FileRequestsManager = () => {
   const [trustedCombinations, setTrustedCombinations] = useState<TrustedCombination[]>([]);
   const [isMarkingTrusted, setIsMarkingTrusted] = useState(false);
   const [suspiciousFilter, setSuspiciousFilter] = useState(false);
+  const [suspiciousCombinations, setSuspiciousCombinations] = useState<SuspiciousCombination[]>([]);
+  const [isMarkingSuspicious, setIsMarkingSuspicious] = useState(false);
   const [isFileListExpanded, setIsFileListExpanded] = useState(false);
   // New state for file selection dialog
   const [showFileSendDialog, setShowFileSendDialog] = useState(false);
@@ -158,8 +167,23 @@ export const FileRequestsManager = () => {
     return Math.max(emailCount, idCount);
   };
 
-  // Check if request is suspicious (same email with different ID or same ID with different email)
+  // Check if manually marked as suspicious
+  const isManuallyMarkedSuspicious = (request: FileRequest) => {
+    const normalizedEmail = request.email.toLowerCase();
+    return suspiciousCombinations.some(
+      (sc) =>
+        sc.email.toLowerCase() === normalizedEmail &&
+        sc.id_number === request.id_number
+    );
+  };
+
+  // Check if request is suspicious (same email with different ID or same ID with different email, or manually marked)
   const isSuspiciousRequest = (request: FileRequest) => {
+    // Check manual marking first
+    if (isManuallyMarkedSuspicious(request)) {
+      return true;
+    }
+    
     const normalizedEmail = request.email.toLowerCase();
     const idsForEmail = userRequestCounts.emailToIds.get(normalizedEmail);
     const emailsForId = userRequestCounts.idToEmails.get(request.id_number);
@@ -173,6 +197,11 @@ export const FileRequestsManager = () => {
   };
 
   const getSuspiciousReason = (request: FileRequest): string => {
+    // Check manual marking first
+    if (isManuallyMarkedSuspicious(request)) {
+      return "סומן ידנית כחשוד";
+    }
+    
     const normalizedEmail = request.email.toLowerCase();
     const idsForEmail = userRequestCounts.emailToIds.get(normalizedEmail);
     const emailsForId = userRequestCounts.idToEmails.get(request.id_number);
@@ -200,6 +229,7 @@ export const FileRequestsManager = () => {
     fetchTemplates();
     fetchCourses();
     fetchTrustedCombinations();
+    fetchSuspiciousCombinations();
   }, []);
 
   const fetchCourses = async () => {
@@ -301,6 +331,82 @@ export const FileRequestsManager = () => {
     }
   };
 
+  const fetchSuspiciousCombinations = async () => {
+    const { data, error } = await supabase
+      .from("suspicious_combinations")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching suspicious combinations:", error);
+    } else {
+      setSuspiciousCombinations(data || []);
+    }
+  };
+
+  const handleMarkAsSuspicious = async (request: FileRequest) => {
+    setIsMarkingSuspicious(true);
+    try {
+      const { error } = await supabase.from("suspicious_combinations").insert({
+        email: request.email.toLowerCase(),
+        id_number: request.id_number,
+      });
+
+      if (error) {
+        if (error.code === "23505") {
+          toast({
+            title: "שילוב כבר קיים",
+            description: "השילוב הזה כבר מסומן כחשוד",
+            variant: "destructive",
+          });
+        } else {
+          throw error;
+        }
+      } else {
+        toast({
+          title: "סומן כחשוד ⚠️",
+          description: "המייל והת.ז יסווגו כחשודים",
+        });
+        fetchSuspiciousCombinations();
+      }
+    } catch (error) {
+      console.error("Error marking as suspicious:", error);
+      toast({
+        title: "שגיאה",
+        description: "לא ניתן לסמן כחשוד",
+        variant: "destructive",
+      });
+    } finally {
+      setIsMarkingSuspicious(false);
+    }
+  };
+
+  const handleRemoveSuspicious = async (request: FileRequest) => {
+    try {
+      const normalizedEmail = request.email.toLowerCase();
+      const { error } = await supabase
+        .from("suspicious_combinations")
+        .delete()
+        .eq("id_number", request.id_number)
+        .ilike("email", normalizedEmail);
+
+      if (error) throw error;
+
+      toast({
+        title: "הוסר מחשודים",
+        description: "השילוב לא יסווג יותר כחשוד",
+      });
+      fetchSuspiciousCombinations();
+    } catch (error) {
+      console.error("Error removing suspicious:", error);
+      toast({
+        title: "שגיאה",
+        description: "לא ניתן להסיר מחשודים",
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
     let base = statusFilter === "all" ? requests : requests.filter((r) => r.status === statusFilter);
     
@@ -342,7 +448,7 @@ export const FileRequestsManager = () => {
     }
     
     setFilteredRequests(base);
-  }, [statusFilter, requests, search, startDate, endDate, userFilter, courseFilter, suspiciousFilter, userRequestCounts]);
+  }, [statusFilter, requests, search, startDate, endDate, userFilter, courseFilter, suspiciousFilter, userRequestCounts, suspiciousCombinations]);
 
   const fetchRequests = async () => {
     setIsLoading(true);
@@ -1111,6 +1217,45 @@ export const FileRequestsManager = () => {
                               </Tooltip>
                             </TooltipProvider>
                           )}
+                          {/* Manual suspicious marking button */}
+                          {isManuallyMarkedSuspicious(request) ? (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button 
+                                    size="sm" 
+                                    variant="ghost" 
+                                    className="h-9 px-2 text-red-600 hover:text-muted-foreground hover:bg-muted"
+                                    onClick={() => handleRemoveSuspicious(request)}
+                                  >
+                                    <AlertTriangle className="w-4 h-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>סומן כחשוד ידנית - לחץ להסרה</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button 
+                                    size="sm" 
+                                    variant="ghost" 
+                                    className="h-9 px-2 hover:text-red-600 hover:bg-red-50"
+                                    onClick={() => handleMarkAsSuspicious(request)}
+                                    disabled={isMarkingSuspicious}
+                                  >
+                                    <AlertTriangle className="w-4 h-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>סמן כחשוד ידנית</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
                           <Button 
                             size="sm" 
                             variant="ghost" 
@@ -1232,6 +1377,27 @@ export const FileRequestsManager = () => {
                           disabled={isMarkingTrusted}
                         >
                           <ShieldCheck className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {/* Mobile: Manual suspicious marking button */}
+                      {isManuallyMarkedSuspicious(request) ? (
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-10 px-3 text-red-600 hover:text-muted-foreground hover:bg-muted"
+                          onClick={() => handleRemoveSuspicious(request)}
+                        >
+                          <AlertTriangle className="w-4 h-4" />
+                        </Button>
+                      ) : (
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-10 px-3 hover:text-red-600 hover:bg-red-50"
+                          onClick={() => handleMarkAsSuspicious(request)}
+                          disabled={isMarkingSuspicious}
+                        >
+                          <AlertTriangle className="w-4 h-4" />
                         </Button>
                       )}
                       <Button 

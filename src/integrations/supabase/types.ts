@@ -128,6 +128,30 @@ export type Database = {
         }
         Relationships: []
       }
+      suspicious_combinations: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          id_number: string
+          marked_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          id_number: string
+          marked_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          id_number?: string
+          marked_by?: string | null
+        }
+        Relationships: []
+      }
       trusted_combinations: {
         Row: {
           course_name: string
