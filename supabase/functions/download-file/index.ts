@@ -49,10 +49,61 @@ serve(async (req) => {
     const fileExists = fileList && fileList.length > 0;
     if (!fileExists) {
       console.log("File not found or expired:", filePath);
-      return new Response(
-        JSON.stringify({ error: "הקבצים היו זמינים להורדה למשך 3 ימים. יש להגיש בקשה חדשה כדי לקבל את הקבצים מחדש" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 }
-      );
+      const errorHtml = `
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>הקובץ אינו זמין</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #333;
+    }
+    .container {
+      background: white;
+      padding: 40px 50px;
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      text-align: center;
+      max-width: 500px;
+    }
+    .icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+    }
+    h1 {
+      margin: 0 0 16px 0;
+      font-size: 24px;
+      color: #1a1a2e;
+    }
+    p {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.6;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">📁</div>
+    <h1>הקובץ אינו זמין</h1>
+    <p>הקבצים היו זמינים להורדה למשך 3 ימים.<br>יש להגיש בקשה חדשה כדי לקבל את הקבצים מחדש.</p>
+  </div>
+</body>
+</html>`;
+      return new Response(errorHtml, {
+        headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" },
+        status: 404
+      });
     }
 
     // Download the file
