@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import FileRequest from "./pages/FileRequest";
 import Settings from "./pages/Settings";
 import Statistics from "./pages/Statistics";
+import FileUnavailable from "./pages/FileUnavailable";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+          <Route path="/file-unavailable" element={<FileUnavailable />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

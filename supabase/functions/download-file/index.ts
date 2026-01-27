@@ -49,19 +49,14 @@ serve(async (req) => {
     const fileExists = fileList && fileList.length > 0;
     if (!fileExists) {
       console.log("File not found or expired:", filePath);
-      // Return simple plain text error message for maximum compatibility
-      const errorMessage = `
-הקובץ אינו זמין
-
-הקבצים היו זמינים להורדה למשך 3 ימים.
-יש להגיש בקשה חדשה כדי לקבל את הקבצים מחדש.
-`;
-      return new Response(errorMessage.trim(), {
+      // Redirect to the error page in the app
+      const appUrl = "https://pdf-embedder.lovable.app";
+      return new Response(null, {
         headers: { 
           ...corsHeaders,
-          "Content-Type": "text/plain; charset=utf-8",
+          "Location": `${appUrl}/file-unavailable`,
         },
-        status: 404
+        status: 302
       });
     }
 
