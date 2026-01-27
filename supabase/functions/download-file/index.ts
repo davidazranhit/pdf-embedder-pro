@@ -71,19 +71,10 @@ serve(async (req) => {
     // Convert blob to ArrayBuffer
     const arrayBuffer = await fileData.arrayBuffer();
 
-    // Delete the file from storage after successful download
-    const { error: deleteError } = await supabase.storage
-      .from("pdf-files")
-      .remove([filePath]);
+    // Files are kept for 3 days and cleaned up by the cleanup-old-files function
+    // Multiple downloads are allowed within this period
 
-    if (deleteError) {
-      console.error("Warning: Failed to delete file after download:", deleteError);
-      // Continue anyway - file was served successfully
-    } else {
-      console.log("File deleted after download:", filePath);
-    }
-
-    // Return the file with proper headers for download
+    // Return the file with proper headers for download (attachment forces download, not preview)
     return new Response(arrayBuffer, {
       headers: {
         ...corsHeaders,
