@@ -101,7 +101,10 @@ serve(async (req) => {
 </body>
 </html>`;
       return new Response(errorHtml, {
-        headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" },
+        headers: { 
+          "Content-Type": "text/html; charset=utf-8",
+          "Access-Control-Allow-Origin": "*"
+        },
         status: 404
       });
     }
