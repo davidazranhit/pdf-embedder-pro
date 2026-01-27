@@ -48,9 +48,9 @@ serve(async (req) => {
 
     const fileExists = fileList && fileList.length > 0;
     if (!fileExists) {
-      console.log("File not found or already downloaded:", filePath);
+      console.log("File not found or expired:", filePath);
       return new Response(
-        JSON.stringify({ error: "הקבצים נמחקים אוטומטית מהשרת אחרי הורדה או אחרי 3 ימים, עליך להגיש בקשה נוספת כדי לקבל את הקבצים מחדש" }),
+        JSON.stringify({ error: "הקבצים היו זמינים להורדה למשך 3 ימים. יש להגיש בקשה חדשה כדי לקבל את הקבצים מחדש" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 }
       );
     }
