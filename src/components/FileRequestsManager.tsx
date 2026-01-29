@@ -1240,7 +1240,6 @@ export const FileRequestsManager = () => {
                         "group transition-colors",
                         selectedRequestIds.has(request.id) && "bg-primary/5",
                         isSuspiciousRequest(request) && "bg-destructive/5",
-                        !isSuspiciousRequest(request) && isRepeatUser(request) && "bg-accent/50",
                         request.status === "pending" && "border-r-4 border-r-primary"
                       )}
                     >
@@ -1465,7 +1464,6 @@ export const FileRequestsManager = () => {
                     "overflow-hidden transition-all",
                     selectedRequestIds.has(request.id) && "ring-2 ring-primary",
                     isSuspiciousRequest(request) && "border-destructive",
-                    !isSuspiciousRequest(request) && isRepeatUser(request) && "border-accent",
                     request.status === "pending" && "border-r-4 border-r-primary"
                   )}
                 >
