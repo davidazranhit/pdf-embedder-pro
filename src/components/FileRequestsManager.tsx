@@ -49,6 +49,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { BulkActionsToolbar } from "./file-requests/BulkActionsToolbar";
+import { BulkSendDialog } from "./file-requests/BulkSendDialog";
 
 interface FileRequest {
   id: string;
@@ -120,6 +122,12 @@ export const FileRequestsManager = () => {
   const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
   const [sendingRequest, setSendingRequest] = useState<FileRequest | null>(null);
   const [isSendingFiles, setIsSendingFiles] = useState(false);
+  
+  // Bulk selection state
+  const [selectedRequestIds, setSelectedRequestIds] = useState<Set<string>>(new Set());
+  const [showBulkSendDialog, setShowBulkSendDialog] = useState(false);
+  const [isBulkSending, setIsBulkSending] = useState(false);
+  const [bulkSendProgress, setBulkSendProgress] = useState({ current: 0, total: 0, currentEmail: "" });
   
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -724,8 +732,147 @@ export const FileRequestsManager = () => {
   const pendingCount = requests.filter(r => r.status === "pending").length;
   const sentCount = requests.filter(r => r.status === "sent").length;
 
+  // Bulk selection handlers
+  const handleToggleRequestSelection = (requestId: string) => {
+    setSelectedRequestIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(requestId)) {
+        newSet.delete(requestId);
+      } else {
+        newSet.add(requestId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAllRequests = () => {
+    // Only select pending requests from filtered list
+    const pendingFiltered = filteredRequests.filter(r => r.status === "pending");
+    setSelectedRequestIds(new Set(pendingFiltered.map(r => r.id)));
+  };
+
+  const handleClearSelection = () => {
+    setSelectedRequestIds(new Set());
+  };
+
+  const getSelectedRequests = () => {
+    return requests.filter(r => selectedRequestIds.has(r.id));
+  };
+
+  const handleBulkSend = async (requestsToSend: FileRequest[], templateIds: string[]) => {
+    if (requestsToSend.length === 0 || templateIds.length === 0) return;
+
+    setIsBulkSending(true);
+    setBulkSendProgress({ current: 0, total: requestsToSend.length, currentEmail: "" });
+
+    const selectedTemplatesList = templates.filter(t => templateIds.includes(t.id));
+    const allFileIds = selectedTemplatesList.map(t => t.file_path);
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < requestsToSend.length; i++) {
+      const request = requestsToSend[i];
+      setBulkSendProgress({ current: i + 1, total: requestsToSend.length, currentEmail: request.email });
+
+      try {
+        // Process watermarks
+        const { data: processData, error: processError } = await supabase.functions.invoke(
+          "process-watermark",
+          {
+            body: {
+              fileIds: allFileIds,
+              email: request.email,
+              userId: request.id_number,
+            },
+          }
+        );
+
+        if (processError || !processData?.files || processData.files.length === 0) {
+          console.error("Error processing watermarks for", request.email, processError);
+          errorCount++;
+          continue;
+        }
+
+        const processedFiles = processData.files.map((f: any) => ({
+          processedId: f.processedId,
+          originalName: f.originalName,
+        }));
+
+        // Send email
+        const { error: sendError } = await supabase.functions.invoke("send-watermarked-files", {
+          body: {
+            email: request.email,
+            fileIds: processedFiles,
+            courseName: request.course_name,
+          },
+        });
+
+        if (sendError) {
+          console.error("Error sending email to", request.email, sendError);
+          errorCount++;
+          continue;
+        }
+
+        // Update request status
+        await supabase
+          .from("file_requests")
+          .update({
+            status: "sent",
+            sent_date: new Date().toISOString(),
+          })
+          .eq("id", request.id);
+
+        successCount++;
+      } catch (error) {
+        console.error("Error processing request", request.id, error);
+        errorCount++;
+      }
+    }
+
+    setIsBulkSending(false);
+    setShowBulkSendDialog(false);
+    setSelectedRequestIds(new Set());
+    fetchRequests();
+
+    if (successCount > 0) {
+      toast({
+        title: "שליחה הושלמה",
+        description: `נשלחו בהצלחה ${successCount} בקשות${errorCount > 0 ? `, ${errorCount} נכשלו` : ""}`,
+      });
+    } else {
+      toast({
+        title: "שגיאה",
+        description: "לא הצלחנו לשלוח את הבקשות",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <>
+      {/* Bulk Actions Toolbar */}
+      <BulkActionsToolbar
+        selectedCount={selectedRequestIds.size}
+        totalCount={filteredRequests.filter(r => r.status === "pending").length}
+        onSelectAll={handleSelectAllRequests}
+        onClearSelection={handleClearSelection}
+        onBulkSend={() => setShowBulkSendDialog(true)}
+        isSending={isBulkSending}
+      />
+
+      {/* Bulk Send Dialog */}
+      <BulkSendDialog
+        open={showBulkSendDialog}
+        onOpenChange={setShowBulkSendDialog}
+        selectedRequests={getSelectedRequests()}
+        templates={templates}
+        categories={categories}
+        onSend={handleBulkSend}
+        isSending={isBulkSending}
+        sendProgress={bulkSendProgress}
+      />
+
       {/* File Selection Dialog */}
       <Dialog open={showFileSendDialog} onOpenChange={setShowFileSendDialog}>
         <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
@@ -756,7 +903,7 @@ export const FileRequestsManager = () => {
                 {sendingRequest.notes && (
                   <div className="pt-3 border-t border-border/50">
                     <div className="flex items-start gap-2">
-                      <MessageSquare className="w-4 h-4 text-amber-500 mt-0.5" />
+                      <MessageSquare className="w-4 h-4 text-muted-foreground mt-0.5" />
                       <p className="text-sm whitespace-pre-wrap">{sendingRequest.notes}</p>
                     </div>
                   </div>
@@ -915,13 +1062,13 @@ export const FileRequestsManager = () => {
             <p className="text-sm text-muted-foreground mt-1">ניהול ושליחת בקשות קבצים</p>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
-              <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-              <span className="text-sm font-medium text-amber-700 dark:text-amber-300">{pendingCount} ממתינות</span>
+            <div className="flex items-center gap-2 px-3 py-2 bg-secondary rounded-lg">
+              <Clock className="w-4 h-4 text-secondary-foreground" />
+              <span className="text-sm font-medium text-secondary-foreground">{pendingCount} ממתינות</span>
             </div>
-            <div className="flex items-center gap-2 px-3 py-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-              <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
-              <span className="text-sm font-medium text-green-700 dark:text-green-300">{sentCount} טופלו</span>
+            <div className="flex items-center gap-2 px-3 py-2 bg-primary/20 rounded-lg">
+              <Check className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium text-primary">{sentCount} טופלו</span>
             </div>
           </div>
         </div>
@@ -1063,6 +1210,21 @@ export const FileRequestsManager = () => {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableHead className="w-[50px] text-center">
+                      <Checkbox
+                        checked={
+                          selectedRequestIds.size > 0 &&
+                          filteredRequests.filter(r => r.status === "pending").every(r => selectedRequestIds.has(r.id))
+                        }
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            handleSelectAllRequests();
+                          } else {
+                            handleClearSelection();
+                          }
+                        }}
+                      />
+                    </TableHead>
                     <TableHead className="text-right font-semibold min-w-[280px]">פרטי קשר</TableHead>
                     <TableHead className="text-right font-semibold min-w-[120px]">קורס</TableHead>
                     <TableHead className="text-right font-semibold w-[130px]">תאריך</TableHead>
@@ -1076,11 +1238,22 @@ export const FileRequestsManager = () => {
                       key={request.id} 
                       className={cn(
                         "group transition-colors",
-                        isSuspiciousRequest(request) && "bg-red-50/50 dark:bg-red-950/10",
-                        !isSuspiciousRequest(request) && isRepeatUser(request) && "bg-amber-50/50 dark:bg-amber-950/10",
-                        request.status === "pending" && "border-r-4 border-r-amber-400"
+                        selectedRequestIds.has(request.id) && "bg-primary/5",
+                        isSuspiciousRequest(request) && "bg-destructive/5",
+                        !isSuspiciousRequest(request) && isRepeatUser(request) && "bg-accent/50",
+                        request.status === "pending" && "border-r-4 border-r-primary"
                       )}
                     >
+                      <TableCell className="text-center">
+                        {request.status === "pending" ? (
+                          <Checkbox
+                            checked={selectedRequestIds.has(request.id)}
+                            onCheckedChange={() => handleToggleRequestSelection(request.id)}
+                          />
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </TableCell>
                       <TableCell className="py-4">
                         <div className="space-y-1.5">
                           <div className="flex items-center gap-2">
@@ -1108,10 +1281,10 @@ export const FileRequestsManager = () => {
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="h-6 w-6 p-0 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/50 dark:hover:bg-amber-800/50 rounded-full"
+                                      className="h-6 w-6 p-0 bg-accent hover:bg-accent/80 rounded-full"
                                       onClick={() => handleFilterByUser(request, 'email')}
                                     >
-                                      <span className="text-xs font-bold text-amber-700 dark:text-amber-300">
+                                      <span className="text-xs font-bold text-accent-foreground">
                                         {getRepeatCount(request)}
                                       </span>
                                     </Button>
@@ -1126,7 +1299,7 @@ export const FileRequestsManager = () => {
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <Badge variant="outline" className="text-xs px-1.5 py-0.5 cursor-help bg-amber-50 border-amber-200 text-amber-700">
+                                    <Badge variant="outline" className="text-xs px-1.5 py-0.5 cursor-help">
                                       <MessageSquare className="w-3 h-3" />
                                     </Badge>
                                   </TooltipTrigger>
@@ -1162,8 +1335,8 @@ export const FileRequestsManager = () => {
                           variant={request.status === "sent" ? "default" : "secondary"}
                           className={cn(
                             "text-xs font-medium",
-                            request.status === "pending" && "bg-amber-100 text-amber-700 hover:bg-amber-100",
-                            request.status === "sent" && "bg-green-100 text-green-700 hover:bg-green-100"
+                            request.status === "pending" && "bg-secondary text-secondary-foreground",
+                            request.status === "sent" && "bg-primary/20 text-primary"
                           )}
                         >
                           {request.status === "sent" ? "✓ טופל" : "ממתין"}
@@ -1186,7 +1359,7 @@ export const FileRequestsManager = () => {
                                   <Button 
                                     size="sm" 
                                     variant="ghost" 
-                                    className="h-9 px-2 text-green-600 hover:text-red-600 hover:bg-red-50"
+                                    className="h-9 px-2 text-primary hover:text-destructive hover:bg-destructive/10"
                                     onClick={() => handleRemoveTrusted(request)}
                                   >
                                     <ShieldCheck className="w-4 h-4" />
@@ -1204,7 +1377,7 @@ export const FileRequestsManager = () => {
                                   <Button 
                                     size="sm" 
                                     variant="ghost" 
-                                    className="h-9 px-2 hover:text-green-600 hover:bg-green-50"
+                                    className="h-9 px-2 hover:text-primary hover:bg-primary/10"
                                     onClick={() => handleMarkAsTrusted(request)}
                                     disabled={isMarkingTrusted}
                                   >
@@ -1225,7 +1398,7 @@ export const FileRequestsManager = () => {
                                   <Button 
                                     size="sm" 
                                     variant="ghost" 
-                                    className="h-9 px-2 text-red-600 hover:text-muted-foreground hover:bg-muted"
+                                    className="h-9 px-2 text-destructive hover:text-muted-foreground hover:bg-muted"
                                     onClick={() => handleRemoveSuspicious(request)}
                                   >
                                     <AlertTriangle className="w-4 h-4" />
@@ -1243,7 +1416,7 @@ export const FileRequestsManager = () => {
                                   <Button 
                                     size="sm" 
                                     variant="ghost" 
-                                    className="h-9 px-2 hover:text-red-600 hover:bg-red-50"
+                                    className="h-9 px-2 hover:text-destructive hover:bg-destructive/10"
                                     onClick={() => handleMarkAsSuspicious(request)}
                                     disabled={isMarkingSuspicious}
                                   >
@@ -1271,7 +1444,7 @@ export const FileRequestsManager = () => {
                           </p>
                         )}
                         {isTrustedCombination(request) && (
-                          <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                          <p className="text-xs text-primary mt-1 flex items-center gap-1">
                             <ShieldCheck className="w-3 h-3" />
                             שילוב אמין
                           </p>
@@ -1290,21 +1463,29 @@ export const FileRequestsManager = () => {
                   key={request.id} 
                   className={cn(
                     "overflow-hidden transition-all",
-                    isSuspiciousRequest(request) && "border-red-300 dark:border-red-800",
-                    !isSuspiciousRequest(request) && isRepeatUser(request) && "border-amber-200 dark:border-amber-800",
-                    request.status === "pending" && "border-r-4 border-r-amber-400"
+                    selectedRequestIds.has(request.id) && "ring-2 ring-primary",
+                    isSuspiciousRequest(request) && "border-destructive",
+                    !isSuspiciousRequest(request) && isRepeatUser(request) && "border-accent",
+                    request.status === "pending" && "border-r-4 border-r-primary"
                   )}
                 >
                   <CardContent className="p-4 space-y-4">
-                    {/* Header */}
+                    {/* Header with checkbox */}
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2 flex-wrap">
+                        {request.status === "pending" && (
+                          <Checkbox
+                            checked={selectedRequestIds.has(request.id)}
+                            onCheckedChange={() => handleToggleRequestSelection(request.id)}
+                            className="mr-1"
+                          />
+                        )}
                         <Badge
                           variant={request.status === "sent" ? "default" : "secondary"}
                           className={cn(
                             "text-xs font-medium",
-                            request.status === "pending" && "bg-amber-100 text-amber-700",
-                            request.status === "sent" && "bg-green-100 text-green-700"
+                            request.status === "pending" && "bg-secondary text-secondary-foreground",
+                            request.status === "sent" && "bg-primary/20 text-primary"
                           )}
                         >
                           {request.status === "sent" ? "✓ טופל" : "ממתין"}
@@ -1315,7 +1496,7 @@ export const FileRequestsManager = () => {
                           </Badge>
                         )}
                         {isRepeatUser(request) && (
-                          <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                          <Badge variant="outline" className="text-xs">
                             משתמש חוזר ({getRepeatCount(request)})
                           </Badge>
                         )}
@@ -1341,10 +1522,10 @@ export const FileRequestsManager = () => {
 
                     {/* Notes */}
                     {request.notes && (
-                      <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3 text-sm">
+                      <div className="bg-accent rounded-lg p-3 text-sm">
                         <div className="flex items-start gap-2">
-                          <MessageSquare className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                          <p className="text-amber-800 dark:text-amber-200 whitespace-pre-wrap">{request.notes}</p>
+                          <MessageSquare className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                          <p className="text-accent-foreground whitespace-pre-wrap">{request.notes}</p>
                         </div>
                       </div>
                     )}
@@ -1363,7 +1544,7 @@ export const FileRequestsManager = () => {
                         <Button 
                           size="sm" 
                           variant="ghost" 
-                          className="h-10 px-3 text-green-600 hover:text-red-600 hover:bg-red-50"
+                          className="h-10 px-3 text-primary hover:text-destructive hover:bg-destructive/10"
                           onClick={() => handleRemoveTrusted(request)}
                         >
                           <ShieldCheck className="w-4 h-4" />
@@ -1372,7 +1553,7 @@ export const FileRequestsManager = () => {
                         <Button 
                           size="sm" 
                           variant="ghost" 
-                          className="h-10 px-3 hover:text-green-600 hover:bg-green-50"
+                          className="h-10 px-3 hover:text-primary hover:bg-primary/10"
                           onClick={() => handleMarkAsTrusted(request)}
                           disabled={isMarkingTrusted}
                         >
@@ -1384,7 +1565,7 @@ export const FileRequestsManager = () => {
                         <Button 
                           size="sm" 
                           variant="ghost" 
-                          className="h-10 px-3 text-red-600 hover:text-muted-foreground hover:bg-muted"
+                          className="h-10 px-3 text-destructive hover:text-muted-foreground hover:bg-muted"
                           onClick={() => handleRemoveSuspicious(request)}
                         >
                           <AlertTriangle className="w-4 h-4" />
@@ -1393,7 +1574,7 @@ export const FileRequestsManager = () => {
                         <Button 
                           size="sm" 
                           variant="ghost" 
-                          className="h-10 px-3 hover:text-red-600 hover:bg-red-50"
+                          className="h-10 px-3 hover:text-destructive hover:bg-destructive/10"
                           onClick={() => handleMarkAsSuspicious(request)}
                           disabled={isMarkingSuspicious}
                         >
@@ -1411,7 +1592,7 @@ export const FileRequestsManager = () => {
                     </div>
 
                     {isTrustedCombination(request) && (
-                      <p className="text-xs text-green-600 text-center pt-2 flex items-center justify-center gap-1">
+                      <p className="text-xs text-primary text-center pt-2 flex items-center justify-center gap-1">
                         <ShieldCheck className="w-3 h-3" />
                         שילוב אמין - שליחה אוטומטית
                       </p>
