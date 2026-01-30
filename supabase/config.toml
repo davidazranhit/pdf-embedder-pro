@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.auto-send-trusted]
 verify_jwt = false
+
+[functions.notify-pending-requests]
+verify_jwt = false

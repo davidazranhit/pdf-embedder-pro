@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { LogoutButton } from "@/components/LogoutButton";
-import { ArrowRight, Settings as SettingsIcon, BookOpen } from "lucide-react";
+import { ArrowRight, Settings as SettingsIcon, BookOpen, Bell } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -45,6 +45,8 @@ const Settings = () => {
   const [coverEmailLabel, setCoverEmailLabel] = useState<string>("אימייל");
   const [coverIdLabel, setCoverIdLabel] = useState<string>("תעודת זהות");
   const [coverSuccessText, setCoverSuccessText] = useState<string>("בהצלחה!");
+  const [adminEmail, setAdminEmail] = useState<string>("davidazran014@gmail.com");
+  const [pendingAlertThreshold, setPendingAlertThreshold] = useState<number>(5);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
@@ -81,6 +83,8 @@ const Settings = () => {
         setCoverEmailLabel(data.cover_email_label ?? "אימייל");
         setCoverIdLabel(data.cover_id_label ?? "תעודת זהות");
         setCoverSuccessText(data.cover_success_text ?? "בהצלחה!");
+        setAdminEmail(data.admin_email ?? "davidazran014@gmail.com");
+        setPendingAlertThreshold(data.pending_alert_threshold ?? 5);
       }
     } catch (error) {
       console.error("Error loading settings:", error);
@@ -133,6 +137,8 @@ const Settings = () => {
           cover_email_label: coverEmailLabel,
           cover_id_label: coverIdLabel,
           cover_success_text: coverSuccessText,
+          admin_email: adminEmail,
+          pending_alert_threshold: pendingAlertThreshold,
         })
         .eq("id", "00000000-0000-0000-0000-000000000001");
 
@@ -498,6 +504,53 @@ const Settings = () => {
                       className="w-full"
                       placeholder='בהצלחה!'
                     />
+                  </div>
+                </div>
+
+                {/* Admin Notifications Section */}
+                <div className="pt-6 border-t border-border">
+                  <h3 className="text-xl font-semibold mb-4 text-foreground flex items-center gap-2">
+                    <Bell className="w-5 h-5" />
+                    התראות מנהל
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    קבל התראה במייל כשיש יותר מדי בקשות ממתינות
+                  </p>
+                  
+                  {/* Admin Email */}
+                  <div className="space-y-3 mb-6">
+                    <Label className="text-base font-medium">
+                      מייל מנהל המערכת
+                    </Label>
+                    <Input
+                      type="email"
+                      value={adminEmail}
+                      onChange={(e) => setAdminEmail(e.target.value)}
+                      className="w-full"
+                      placeholder="admin@example.com"
+                      dir="ltr"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      לכתובת זו יישלחו התראות כשמספר הבקשות הממתינות עובר את הסף
+                    </p>
+                  </div>
+
+                  {/* Pending Threshold */}
+                  <div className="space-y-3 mb-6">
+                    <Label className="text-base font-medium">
+                      סף התראה (מספר בקשות ממתינות): {pendingAlertThreshold}
+                    </Label>
+                    <Slider
+                      value={[pendingAlertThreshold]}
+                      onValueChange={(val) => setPendingAlertThreshold(val[0])}
+                      min={1}
+                      max={20}
+                      step={1}
+                      className="w-full"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      כשמספר הבקשות הממתינות יגיע ל-{pendingAlertThreshold} או יותר, תישלח התראה למייל
+                    </p>
                   </div>
                 </div>
 

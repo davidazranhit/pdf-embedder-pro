@@ -202,6 +202,7 @@ export type Database = {
       }
       watermark_settings: {
         Row: {
+          admin_email: string | null
           center_rotation: number
           cover_email_label: string
           cover_id_label: string
@@ -220,11 +221,13 @@ export type Database = {
           hidden_watermark_row_spacing: number | null
           id: string
           opacity: number
+          pending_alert_threshold: number | null
           position_settings: Json | null
           positions: Json
           updated_at: string | null
         }
         Insert: {
+          admin_email?: string | null
           center_rotation?: number
           cover_email_label?: string
           cover_id_label?: string
@@ -243,11 +246,13 @@ export type Database = {
           hidden_watermark_row_spacing?: number | null
           id?: string
           opacity?: number
+          pending_alert_threshold?: number | null
           position_settings?: Json | null
           positions?: Json
           updated_at?: string | null
         }
         Update: {
+          admin_email?: string | null
           center_rotation?: number
           cover_email_label?: string
           cover_id_label?: string
@@ -266,6 +271,7 @@ export type Database = {
           hidden_watermark_row_spacing?: number | null
           id?: string
           opacity?: number
+          pending_alert_threshold?: number | null
           position_settings?: Json | null
           positions?: Json
           updated_at?: string | null

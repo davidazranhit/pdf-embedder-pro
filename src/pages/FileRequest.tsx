@@ -115,6 +115,14 @@ const FileRequest = () => {
 
       if (error) throw error;
 
+      // Notify admin if pending threshold exceeded
+      try {
+        await supabase.functions.invoke("notify-pending-requests");
+      } catch (notifyError) {
+        console.error("Notify admin failed:", notifyError);
+        // Don't block on notification failure
+      }
+
       // Check if this is a trusted combination and auto-send if so
       try {
         const { data: autoSendResult } = await supabase.functions.invoke("auto-send-trusted", {
