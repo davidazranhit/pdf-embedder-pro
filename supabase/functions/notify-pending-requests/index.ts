@@ -101,7 +101,7 @@ serve(async (req) => {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          sender: { email: "noreply@system.local", name: "מערכת PDF" },
+          sender: { name: "David's Pdf System", email: "davidazranhit@gmail.com" },
           to: [{ email: adminEmail }],
           subject: `📋 ממתינות לך ${pendingCount} בקשות במערכת`,
           htmlContent: emailHtml,
