@@ -47,7 +47,7 @@ interface RequestData {
   course_name: string;
   submission_date: string;
   sent_date: string | null;
-  status: "pending" | "sent";
+  status: "pending" | "sent" | "handled_not_sent";
 }
 
 interface UserStats {

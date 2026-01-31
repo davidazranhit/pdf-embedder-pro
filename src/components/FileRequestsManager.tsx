@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Send, Filter, Calendar as CalendarIcon, X, Users, Check, Mail, User, BookOpen, Clock, MessageSquare, ChevronDown, ShieldCheck, Eye, AlertTriangle } from "lucide-react";
+import { FileText, Send, Filter, Calendar as CalendarIcon, X, Users, Check, Mail, User, BookOpen, Clock, MessageSquare, ChevronDown, ShieldCheck, Eye, AlertTriangle, Ban, RotateCcw } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -59,7 +59,7 @@ interface FileRequest {
   course_name: string;
   notes: string | null;
   submission_date: string;
-  status: "pending" | "sent";
+  status: "pending" | "sent" | "handled_not_sent";
   sent_date: string | null;
 }
 
@@ -731,6 +731,56 @@ export const FileRequestsManager = () => {
   // Stats
   const pendingCount = requests.filter(r => r.status === "pending").length;
   const sentCount = requests.filter(r => r.status === "sent").length;
+  const handledNotSentCount = requests.filter(r => r.status === "handled_not_sent").length;
+
+  // Mark as handled but not sent
+  const handleMarkAsHandledNotSent = async (request: FileRequest) => {
+    try {
+      const { error } = await supabase
+        .from("file_requests")
+        .update({ status: "handled_not_sent" as any })
+        .eq("id", request.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "סומן כטופל",
+        description: "הבקשה סומנה כ'טופל - לא נשלח'",
+      });
+      fetchRequests();
+    } catch (error) {
+      console.error("Error marking as handled:", error);
+      toast({
+        title: "שגיאה",
+        description: "לא ניתן לעדכן סטטוס",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRevertToPending = async (request: FileRequest) => {
+    try {
+      const { error } = await supabase
+        .from("file_requests")
+        .update({ status: "pending" as any, sent_date: null })
+        .eq("id", request.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "הוחזר לממתין",
+        description: "הבקשה הוחזרה לסטטוס ממתין",
+      });
+      fetchRequests();
+    } catch (error) {
+      console.error("Error reverting to pending:", error);
+      toast({
+        title: "שגיאה",
+        description: "לא ניתן לעדכן סטטוס",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Bulk selection handlers
   const handleToggleRequestSelection = (requestId: string) => {
@@ -1068,8 +1118,14 @@ export const FileRequestsManager = () => {
             </div>
             <div className="flex items-center gap-2 px-3 py-2 bg-primary/20 rounded-lg">
               <Check className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium text-primary">{sentCount} טופלו</span>
+              <span className="text-sm font-medium text-primary">{sentCount} נשלחו</span>
             </div>
+            {handledNotSentCount > 0 && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg">
+                <Ban className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-muted-foreground">{handledNotSentCount} טופלו ללא שליחה</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1112,7 +1168,8 @@ export const FileRequestsManager = () => {
                   <SelectContent>
                     <SelectItem value="all">כל הסטטוסים</SelectItem>
                     <SelectItem value="pending">ממתין</SelectItem>
-                    <SelectItem value="sent">טופל</SelectItem>
+                    <SelectItem value="sent">נשלח</SelectItem>
+                    <SelectItem value="handled_not_sent">טופל - לא נשלח</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={courseFilter} onValueChange={setCourseFilter}>
@@ -1335,22 +1392,63 @@ export const FileRequestsManager = () => {
                           className={cn(
                             "text-xs font-medium",
                             request.status === "pending" && "bg-secondary text-secondary-foreground",
-                            request.status === "sent" && "bg-primary/20 text-primary"
+                            request.status === "sent" && "bg-primary/20 text-primary",
+                            request.status === "handled_not_sent" && "bg-muted text-muted-foreground"
                           )}
                         >
-                          {request.status === "sent" ? "✓ טופל" : "ממתין"}
+                          {request.status === "sent" ? "✓ נשלח" : request.status === "handled_not_sent" ? "⊘ טופל - לא נשלח" : "ממתין"}
                         </Badge>
                       </TableCell>
                       <TableCell className="py-4">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Button 
-                            size="sm" 
-                            className="h-9" 
-                            onClick={() => handleOpenFileSendDialog(request)}
-                          >
-                            <Send className="w-4 h-4 ml-1" />
-                            שלח קבצים
-                          </Button>
+                          {request.status === "pending" && (
+                            <>
+                              <Button 
+                                size="sm" 
+                                className="h-9" 
+                                onClick={() => handleOpenFileSendDialog(request)}
+                              >
+                                <Send className="w-4 h-4 ml-1" />
+                                שלח קבצים
+                              </Button>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline" 
+                                      className="h-9 px-2"
+                                      onClick={() => handleMarkAsHandledNotSent(request)}
+                                    >
+                                      <Ban className="w-4 h-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>סמן כטופל - לא נשלח</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </>
+                          )}
+                          {(request.status === "sent" || request.status === "handled_not_sent") && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button 
+                                    size="sm" 
+                                    variant="ghost" 
+                                    className="h-9 px-2"
+                                    onClick={() => handleRevertToPending(request)}
+                                  >
+                                    <RotateCcw className="w-4 h-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>החזר לממתין</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
                           {isTrustedCombination(request) ? (
                             <TooltipProvider>
                               <Tooltip>
@@ -1483,10 +1581,11 @@ export const FileRequestsManager = () => {
                           className={cn(
                             "text-xs font-medium",
                             request.status === "pending" && "bg-secondary text-secondary-foreground",
-                            request.status === "sent" && "bg-primary/20 text-primary"
+                            request.status === "sent" && "bg-primary/20 text-primary",
+                            request.status === "handled_not_sent" && "bg-muted text-muted-foreground"
                           )}
                         >
-                          {request.status === "sent" ? "✓ טופל" : "ממתין"}
+                          {request.status === "sent" ? "✓ נשלח" : request.status === "handled_not_sent" ? "⊘ טופל - לא נשלח" : "ממתין"}
                         </Badge>
                         {isSuspiciousRequest(request) && (
                           <Badge variant="destructive" className="text-xs">
@@ -1530,14 +1629,37 @@ export const FileRequestsManager = () => {
 
                     {/* Actions */}
                     <div className="flex gap-2 pt-3 border-t">
-                      <Button 
-                        size="sm" 
-                        className="flex-1 h-10" 
-                        onClick={() => handleOpenFileSendDialog(request)}
-                      >
-                        <Send className="w-4 h-4 ml-1" />
-                        שלח קבצים
-                      </Button>
+                      {request.status === "pending" && (
+                        <>
+                          <Button 
+                            size="sm" 
+                            className="flex-1 h-10" 
+                            onClick={() => handleOpenFileSendDialog(request)}
+                          >
+                            <Send className="w-4 h-4 ml-1" />
+                            שלח קבצים
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="h-10 px-3"
+                            onClick={() => handleMarkAsHandledNotSent(request)}
+                          >
+                            <Ban className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+                      {(request.status === "sent" || request.status === "handled_not_sent") && (
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-10 px-3"
+                          onClick={() => handleRevertToPending(request)}
+                        >
+                          <RotateCcw className="w-4 h-4 ml-1" />
+                          החזר לממתין
+                        </Button>
+                      )}
                       {isTrustedCombination(request) ? (
                         <Button 
                           size="sm" 
