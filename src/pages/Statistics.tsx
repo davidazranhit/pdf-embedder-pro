@@ -27,7 +27,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { BarChart3, ArrowRight, Search, Users, Mail, FileText, Trash2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { BarChart3, ArrowRight, Search, Users, Mail, FileText, Trash2, ArrowUpDown } from "lucide-react";
 import { RequestsTrendChart } from "@/components/statistics/RequestsTrendChart";
 import { CourseDistributionChart } from "@/components/statistics/CourseDistributionChart";
 import { ProcessingTimeStats } from "@/components/statistics/ProcessingTimeStats";
@@ -52,10 +59,13 @@ interface UserStats {
   requestIds: string[];
 }
 
+type SortOption = "date-desc" | "date-asc" | "requests-desc" | "requests-asc";
+
 const Statistics = () => {
   const [requests, setRequests] = useState<RequestData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("date-desc");
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
@@ -113,22 +123,37 @@ const Statistics = () => {
       }
     });
 
-    return Array.from(userMap.values()).sort((a, b) => 
-      new Date(b.lastRequest).getTime() - new Date(a.lastRequest).getTime()
-    );
+    return Array.from(userMap.values());
   }, [requests]);
+
+  // Sort users
+  const sortedStats = useMemo(() => {
+    const sorted = [...userStats];
+    switch (sortBy) {
+      case "date-desc":
+        return sorted.sort((a, b) => new Date(b.lastRequest).getTime() - new Date(a.lastRequest).getTime());
+      case "date-asc":
+        return sorted.sort((a, b) => new Date(a.lastRequest).getTime() - new Date(b.lastRequest).getTime());
+      case "requests-desc":
+        return sorted.sort((a, b) => b.totalRequests - a.totalRequests);
+      case "requests-asc":
+        return sorted.sort((a, b) => a.totalRequests - b.totalRequests);
+      default:
+        return sorted;
+    }
+  }, [userStats, sortBy]);
 
   // Filter by search
   const filteredStats = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return userStats;
+    if (!q) return sortedStats;
     
-    return userStats.filter((user) =>
+    return sortedStats.filter((user) =>
       user.email.toLowerCase().includes(q) ||
       user.id_number.toLowerCase().includes(q) ||
       user.courses.some((c) => c.toLowerCase().includes(q))
     );
-  }, [userStats, search]);
+  }, [sortedStats, search]);
 
   // Course statistics
   const courseStats = useMemo(() => {
@@ -298,7 +323,7 @@ const Statistics = () => {
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <h2 className="text-xl font-semibold">רשימת משתמשים</h2>
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-4">
                   {selectedCount > 0 && (
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
@@ -328,12 +353,26 @@ const Statistics = () => {
                     </AlertDialog>
                   )}
                   <div className="flex items-center gap-2">
+                    <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+                    <Select dir="rtl" value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="מיין לפי..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="date-desc">תאריך (חדש לישן)</SelectItem>
+                        <SelectItem value="date-asc">תאריך (ישן לחדש)</SelectItem>
+                        <SelectItem value="requests-desc">בקשות (הרבה למעט)</SelectItem>
+                        <SelectItem value="requests-asc">בקשות (מעט להרבה)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
                     <Search className="w-4 h-4 text-muted-foreground" />
                     <Input
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       placeholder="חיפוש לפי מייל, ת.ז או קורס..."
-                      className="max-w-[300px]"
+                      className="max-w-[250px]"
                     />
                   </div>
                 </div>
