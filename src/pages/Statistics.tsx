@@ -15,7 +15,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { BarChart3, ArrowRight, Search, Users, Mail, FileText } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { BarChart3, ArrowRight, Search, Users, Mail, FileText, Trash2 } from "lucide-react";
 import { RequestsTrendChart } from "@/components/statistics/RequestsTrendChart";
 import { CourseDistributionChart } from "@/components/statistics/CourseDistributionChart";
 import { ProcessingTimeStats } from "@/components/statistics/ProcessingTimeStats";
@@ -37,12 +49,15 @@ interface UserStats {
   courses: string[];
   totalRequests: number;
   lastRequest: string;
+  requestIds: string[];
 }
 
 const Statistics = () => {
   const [requests, setRequests] = useState<RequestData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -82,6 +97,7 @@ const Statistics = () => {
           existing.courses.push(req.course_name);
         }
         existing.totalRequests++;
+        existing.requestIds.push(req.id);
         if (new Date(req.submission_date) > new Date(existing.lastRequest)) {
           existing.lastRequest = req.submission_date;
         }
@@ -92,6 +108,7 @@ const Statistics = () => {
           courses: [req.course_name],
           totalRequests: 1,
           lastRequest: req.submission_date,
+          requestIds: [req.id],
         });
       }
     });
@@ -131,6 +148,73 @@ const Statistics = () => {
       day: "numeric",
     });
   };
+
+  const toggleUserSelection = (userKey: string) => {
+    setSelectedUsers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(userKey)) {
+        newSet.delete(userKey);
+      } else {
+        newSet.add(userKey);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedUsers.size === filteredStats.length) {
+      setSelectedUsers(new Set());
+    } else {
+      const allKeys = new Set(filteredStats.map(u => `${u.email}-${u.id_number}`));
+      setSelectedUsers(allKeys);
+    }
+  };
+
+  const getSelectedRequestIds = (): string[] => {
+    const ids: string[] = [];
+    filteredStats.forEach(user => {
+      const key = `${user.email}-${user.id_number}`;
+      if (selectedUsers.has(key)) {
+        ids.push(...user.requestIds);
+      }
+    });
+    return ids;
+  };
+
+  const handleDeleteSelected = async () => {
+    const requestIds = getSelectedRequestIds();
+    if (requestIds.length === 0) return;
+
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("file_requests")
+        .delete()
+        .in("id", requestIds);
+
+      if (error) throw error;
+
+      toast({
+        title: "הבקשות נמחקו בהצלחה",
+        description: `${requestIds.length} בקשות הוסרו מהמערכת`,
+      });
+
+      setSelectedUsers(new Set());
+      await fetchRequests();
+    } catch (error) {
+      console.error("Error deleting requests:", error);
+      toast({
+        title: "שגיאה",
+        description: "לא ניתן למחוק את הבקשות",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const selectedCount = selectedUsers.size;
+  const selectedRequestsCount = getSelectedRequestIds().length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
@@ -212,16 +296,46 @@ const Statistics = () => {
           {/* Users Table */}
           <Card className="p-6">
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-4">
                 <h2 className="text-xl font-semibold">רשימת משתמשים</h2>
-                <div className="flex items-center gap-2">
-                  <Search className="w-4 h-4 text-muted-foreground" />
-                  <Input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="חיפוש לפי מייל, ת.ז או קורס..."
-                    className="max-w-[300px]"
-                  />
+                <div className="flex items-center gap-4">
+                  {selectedCount > 0 && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" size="sm" disabled={isDeleting}>
+                          <Trash2 className="w-4 h-4 ml-2" />
+                          מחק {selectedCount} משתמשים ({selectedRequestsCount} בקשות)
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent dir="rtl">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>האם אתה בטוח?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            פעולה זו תמחק לצמיתות {selectedRequestsCount} בקשות מ-{selectedCount} משתמשים.
+                            לא ניתן לבטל פעולה זו.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="flex-row-reverse gap-2">
+                          <AlertDialogCancel>ביטול</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={handleDeleteSelected}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            מחק לצמיתות
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Search className="w-4 h-4 text-muted-foreground" />
+                    <Input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="חיפוש לפי מייל, ת.ז או קורס..."
+                      className="max-w-[300px]"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -241,6 +355,12 @@ const Statistics = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-12">
+                          <Checkbox
+                            checked={selectedUsers.size === filteredStats.length && filteredStats.length > 0}
+                            onCheckedChange={toggleSelectAll}
+                          />
+                        </TableHead>
                         <TableHead className="text-right">מייל</TableHead>
                         <TableHead className="text-right">תעודת זהות</TableHead>
                         <TableHead className="text-right">קורסים מבוקשים</TableHead>
@@ -249,27 +369,40 @@ const Statistics = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredStats.map((user, index) => (
-                        <TableRow key={`${user.email}-${user.id_number}-${index}`}>
-                          <TableCell className="font-medium">{user.email}</TableCell>
-                          <TableCell>{user.id_number}</TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {user.courses.map((course) => (
-                                <Badge key={course} variant="outline" className="text-xs">
-                                  {course}
-                                </Badge>
-                              ))}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={user.totalRequests > 1 ? "default" : "secondary"}>
-                              {user.totalRequests}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{formatDate(user.lastRequest)}</TableCell>
-                        </TableRow>
-                      ))}
+                      {filteredStats.map((user, index) => {
+                        const userKey = `${user.email}-${user.id_number}`;
+                        const isSelected = selectedUsers.has(userKey);
+                        return (
+                          <TableRow 
+                            key={`${userKey}-${index}`}
+                            className={isSelected ? "bg-muted/50" : ""}
+                          >
+                            <TableCell>
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => toggleUserSelection(userKey)}
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">{user.email}</TableCell>
+                            <TableCell>{user.id_number}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {user.courses.map((course) => (
+                                  <Badge key={course} variant="outline" className="text-xs">
+                                    {course}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={user.totalRequests > 1 ? "default" : "secondary"}>
+                                {user.totalRequests}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{formatDate(user.lastRequest)}</TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
