@@ -5,7 +5,7 @@ import { Clock, CheckCircle2, AlertCircle, Timer } from "lucide-react";
 interface RequestData {
   submission_date: string;
   sent_date: string | null;
-  status: "pending" | "sent";
+  status: "pending" | "sent" | "handled_not_sent";
 }
 
 interface ProcessingTimeStatsProps {

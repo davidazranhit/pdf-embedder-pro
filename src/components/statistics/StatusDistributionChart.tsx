@@ -11,7 +11,7 @@ import {
 import { CheckSquare } from "lucide-react";
 
 interface RequestData {
-  status: "pending" | "sent";
+  status: "pending" | "sent" | "handled_not_sent";
 }
 
 interface StatusDistributionChartProps {
@@ -21,16 +21,19 @@ interface StatusDistributionChartProps {
 const COLORS = {
   sent: "hsl(142.1 76.2% 36.3%)",
   pending: "hsl(38 92% 50%)",
+  handled_not_sent: "hsl(var(--muted-foreground))",
 };
 
 export const StatusDistributionChart = ({ requests }: StatusDistributionChartProps) => {
   const chartData = useMemo(() => {
     const sent = requests.filter(r => r.status === "sent").length;
     const pending = requests.filter(r => r.status === "pending").length;
+    const handledNotSent = requests.filter(r => r.status === "handled_not_sent").length;
     
     return [
       { name: "נשלחו", value: sent, fill: COLORS.sent },
       { name: "ממתינים", value: pending, fill: COLORS.pending },
+      { name: "טופל - לא נשלח", value: handledNotSent, fill: COLORS.handled_not_sent },
     ].filter(item => item.value > 0);
   }, [requests]);
 

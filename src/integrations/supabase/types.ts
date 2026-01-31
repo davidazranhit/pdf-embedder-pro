@@ -293,7 +293,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
-      request_status: "pending" | "sent"
+      request_status: "pending" | "sent" | "handled_not_sent"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -422,7 +422,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
-      request_status: ["pending", "sent"],
+      request_status: ["pending", "sent", "handled_not_sent"],
     },
   },
 } as const

@@ -27,7 +27,7 @@ interface FileRequest {
   course_name: string;
   notes: string | null;
   submission_date: string;
-  status: "pending" | "sent";
+  status: "pending" | "sent" | "handled_not_sent";
   sent_date: string | null;
 }
 

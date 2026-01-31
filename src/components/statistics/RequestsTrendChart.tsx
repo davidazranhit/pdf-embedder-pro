@@ -14,7 +14,7 @@ import { TrendingUp } from "lucide-react";
 
 interface RequestData {
   submission_date: string;
-  status: "pending" | "sent";
+  status: "pending" | "sent" | "handled_not_sent";
 }
 
 interface RequestsTrendChartProps {
