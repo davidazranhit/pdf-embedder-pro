@@ -16,6 +16,10 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { BarChart3, ArrowRight, Search, Users, Mail, FileText } from "lucide-react";
+import { RequestsTrendChart } from "@/components/statistics/RequestsTrendChart";
+import { CourseDistributionChart } from "@/components/statistics/CourseDistributionChart";
+import { ProcessingTimeStats } from "@/components/statistics/ProcessingTimeStats";
+import { StatusDistributionChart } from "@/components/statistics/StatusDistributionChart";
 
 interface RequestData {
   id: string;
@@ -23,6 +27,7 @@ interface RequestData {
   id_number: string;
   course_name: string;
   submission_date: string;
+  sent_date: string | null;
   status: "pending" | "sent";
 }
 
@@ -48,7 +53,7 @@ const Statistics = () => {
     setIsLoading(true);
     const { data, error } = await supabase
       .from("file_requests")
-      .select("id, email, id_number, course_name, submission_date, status")
+      .select("id, email, id_number, course_name, submission_date, sent_date, status")
       .order("submission_date", { ascending: false });
 
     if (error) {
@@ -192,17 +197,17 @@ const Statistics = () => {
             </Card>
           </div>
 
-          {/* Course Statistics */}
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4">התפלגות לפי קורסים</h2>
-            <div className="flex flex-wrap gap-2">
-              {courseStats.map((course) => (
-                <Badge key={course.name} variant="secondary" className="text-sm py-1 px-3">
-                  {course.name}: {course.count} בקשות
-                </Badge>
-              ))}
-            </div>
-          </Card>
+          {/* Processing Time Stats */}
+          <ProcessingTimeStats requests={requests} />
+
+          {/* Charts Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <RequestsTrendChart requests={requests} />
+            <StatusDistributionChart requests={requests} />
+          </div>
+
+          {/* Course Distribution Chart */}
+          <CourseDistributionChart courseStats={courseStats} />
 
           {/* Users Table */}
           <Card className="p-6">
