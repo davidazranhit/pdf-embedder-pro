@@ -28,6 +28,10 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Check if this is a scheduled (cron) call vs threshold-based call
+    const url = new URL(req.url);
+    const isScheduledCall = url.searchParams.get("scheduled") === "true";
+
     // Get settings
     const { data: settings, error: settingsError } = await supabase
       .from("watermark_settings")
@@ -63,15 +67,25 @@ serve(async (req) => {
     }
 
     const pendingCount = count || 0;
-    console.log(`Pending requests: ${pendingCount}, threshold: ${threshold}`);
+    console.log(`Pending requests: ${pendingCount}, threshold: ${threshold}, isScheduledCall: ${isScheduledCall}`);
 
-    if (pendingCount >= threshold) {
+    // For scheduled calls: send if there are ANY pending requests
+    // For threshold calls: send only if pending count >= threshold
+    const shouldSend = isScheduledCall ? pendingCount > 0 : pendingCount >= threshold;
+
+    if (shouldSend) {
       // Send notification email via Brevo
       const systemUrl = "https://pdf-embedder.lovable.app/sys-admin";
       
+      const emailSubject = isScheduledCall 
+        ? `📋 דו"ח יומי: ${pendingCount} בקשות ממתינות`
+        : `📋 ממתינות לך ${pendingCount} בקשות במערכת`;
+      
       const emailHtml = `
         <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h1 style="color: #333; text-align: center;">🔔 התראה על בקשות ממתינות</h1>
+          <h1 style="color: #333; text-align: center;">
+            ${isScheduledCall ? '📊 דו"ח יומי' : '🔔 התראה על בקשות ממתינות'}
+          </h1>
           
           <div style="background: #f7f7fa; border-radius: 10px; padding: 20px; margin: 20px 0; text-align: center;">
             <p style="font-size: 18px; margin: 0;">
@@ -88,7 +102,9 @@ serve(async (req) => {
           <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
           
           <p style="color: #888; font-size: 12px; text-align: center;">
-            הודעה אוטומטית זו נשלחה כי מספר הבקשות הממתינות עבר את הסף שהוגדר (${threshold})
+            ${isScheduledCall 
+              ? 'הודעה אוטומטית זו נשלחת מדי יום בשעה 20:00' 
+              : `הודעה אוטומטית זו נשלחה כי מספר הבקשות הממתינות עבר את הסף שהוגדר (${threshold})`}
           </p>
         </div>
       `;
@@ -103,7 +119,7 @@ serve(async (req) => {
         body: JSON.stringify({
           sender: { name: "David's Pdf System", email: "davidazranhit@gmail.com" },
           to: [{ email: adminEmail }],
-          subject: `📋 ממתינות לך ${pendingCount} בקשות במערכת`,
+          subject: emailSubject,
           htmlContent: emailHtml,
         }),
       });
@@ -123,6 +139,7 @@ serve(async (req) => {
           sent: true,
           pendingCount,
           adminEmail,
+          isScheduledCall,
           messageId: result.messageId 
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -133,7 +150,9 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         sent: false, 
-        reason: `Pending count (${pendingCount}) is below threshold (${threshold})` 
+        reason: isScheduledCall 
+          ? "No pending requests" 
+          : `Pending count (${pendingCount}) is below threshold (${threshold})` 
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
