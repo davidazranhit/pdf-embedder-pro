@@ -20,8 +20,8 @@ export const useEditorSettings = () => {
         return;
       }
 
-      // Only editors need their own settings
-      if (!isEditor) {
+      // Only editors (not admins) need their own settings
+      if (!isEditor || isAdmin) {
         setIsLoading(false);
         return;
       }
@@ -59,7 +59,7 @@ export const useEditorSettings = () => {
     };
 
     fetchSettings();
-  }, [userId, isEditor, isRoleLoading]);
+  }, [userId, isEditor, isAdmin, isRoleLoading]);
 
   const updateSettings = async (updates: Partial<EditorSettings>) => {
     if (!settings?.id) return false;
