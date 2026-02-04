@@ -45,7 +45,7 @@ const FileRequest = () => {
   const [formWarning, setFormWarning] = useState("כל ניסיון שיתוף או הפצת הקבצים מהווה הפרה חמורה של זכויות יוצרים ויטופל בהתאם");
   const { toast } = useToast();
 
-  const normalizeEmail = (value: string) => value.trim();
+  const normalizeEmail = (value: string) => value.trim().toLowerCase();
 
   const normalizeIsraeliId = (value: string) => {
     const digits = value.replace(/\D/g, "");
@@ -149,7 +149,7 @@ const FileRequest = () => {
       const ownerId = targetOwnerId;
 
       // Insert the request with owner_id to route to correct editor
-      const { data: insertedRequest, error } = await supabase
+      const { error } = await supabase
         .from("file_requests")
         .insert({
           email: normalizedEmail,
@@ -157,9 +157,7 @@ const FileRequest = () => {
           course_name: normalizedCourseName,
           notes: normalizedNotes || null,
           owner_id: ownerId,
-        })
-        .select("id")
-        .single();
+        });
 
       if (error) throw error;
 
@@ -178,7 +176,8 @@ const FileRequest = () => {
             email: normalizedEmail,
             id_number: normalizedIdNumber,
             course_name: normalizedCourseName,
-            request_id: insertedRequest.id,
+            // request_id omitted intentionally: anonymous users can't SELECT the inserted row due to RLS.
+            // The backend function will locate the latest matching request and update its status.
           },
         });
 
