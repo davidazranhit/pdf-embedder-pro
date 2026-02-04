@@ -37,6 +37,7 @@ serve(async (req) => {
     }
 
     // Check if the user is an admin
+    console.log("Checking admin role for user:", user.id, user.email);
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from("user_roles")
       .select("role")
@@ -44,7 +45,10 @@ serve(async (req) => {
       .eq("role", "admin")
       .single();
 
+    console.log("Role check result:", { roleData, roleError });
+
     if (roleError || !roleData) {
+      console.error("Admin check failed:", roleError);
       return new Response(
         JSON.stringify({ error: "Only admins can list users" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 403 }
