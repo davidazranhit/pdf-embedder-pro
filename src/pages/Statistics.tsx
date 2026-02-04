@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 import { LogoutButton } from "@/components/LogoutButton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -34,11 +35,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BarChart3, ArrowRight, Search, Users, Mail, FileText, Trash2, ArrowUpDown } from "lucide-react";
+import { BarChart3, ArrowRight, Search, Users, Mail, FileText, Trash2, ArrowUpDown, History } from "lucide-react";
 import { RequestsTrendChart } from "@/components/statistics/RequestsTrendChart";
 import { CourseDistributionChart } from "@/components/statistics/CourseDistributionChart";
 import { ProcessingTimeStats } from "@/components/statistics/ProcessingTimeStats";
 import { StatusDistributionChart } from "@/components/statistics/StatusDistributionChart";
+import { AuditLogViewer } from "@/components/AuditLogViewer";
 
 interface RequestData {
   id: string;
@@ -269,6 +271,19 @@ const Statistics = () => {
             </div>
           </div>
 
+          <Tabs defaultValue="overview" className="space-y-6" dir="rtl">
+            <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
+              <TabsTrigger value="overview" className="gap-2">
+                <BarChart3 className="w-4 h-4" />
+                סקירה כללית
+              </TabsTrigger>
+              <TabsTrigger value="audit" className="gap-2">
+                <History className="w-4 h-4" />
+                יומן פעולות
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="space-y-6">
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="p-6">
@@ -448,6 +463,12 @@ const Statistics = () => {
               )}
             </div>
           </Card>
+            </TabsContent>
+
+            <TabsContent value="audit">
+              <AuditLogViewer />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>
