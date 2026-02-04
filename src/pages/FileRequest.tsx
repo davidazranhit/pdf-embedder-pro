@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+// Admin user ID - requests from /request-access go to this user
+const ADMIN_USER_ID = "c7a6bf76-9455-4891-9570-9aa6fb69bd87";
+
 interface Course {
   id: string;
   name: string;
@@ -23,6 +27,11 @@ interface Course {
 }
 
 const FileRequest = () => {
+  const { editorId } = useParams<{ editorId?: string }>();
+  
+  // Determine the target owner - either specific editor or admin
+  const targetOwnerId = editorId || ADMIN_USER_ID;
+  
   const [email, setEmail] = useState("");
   const [idNumber, setIdNumber] = useState("");
   const [courseName, setCourseName] = useState("");
@@ -30,6 +39,7 @@ const FileRequest = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
+  const [editorNotFound, setEditorNotFound] = useState(false);
   const [formTitle, setFormTitle] = useState("בקשת קבצים");
   const [formInstructions, setFormInstructions] = useState("הוראות למילוי:\n\nעליך להזין מייל ותעודת זהות וקורס מבוקש.\n\nלאחר שליחת הבקשה הפרטים יועברו לבדיקה ולאחר אישור (אין טעם לעדכן ששלחתם את הבקשה, היא תטופל בהקדם) יישלחו הקבצים המבוקשים ישירות למייל עם הפרטים האישיים מוטמעים על הקבצים למניעת שיתוף והפצה.");
   const [formWarning, setFormWarning] = useState("כל ניסיון שיתוף או הפצת הקבצים מהווה הפרה חמורה של זכויות יוצרים ויטופל בהתאם");
@@ -38,7 +48,7 @@ const FileRequest = () => {
   useEffect(() => {
     loadFormTexts();
     loadCourses();
-  }, []);
+  }, [targetOwnerId]);
 
   const loadFormTexts = async () => {
     try {
@@ -62,14 +72,31 @@ const FileRequest = () => {
 
   const loadCourses = async () => {
     try {
-      // Load all active courses - RLS will filter by owner
+      // Load courses for the specific owner (editor or admin)
       const { data, error } = await supabase
         .from("courses")
         .select("id, name, owner_id")
         .eq("is_active", true)
+        .eq("owner_id", targetOwnerId)
         .order("created_at", { ascending: true });
 
       if (error) throw error;
+      
+      // If editor specified but no courses found, check if editor exists
+      if (editorId && (!data || data.length === 0)) {
+        // Check if there are ANY courses for this editor (even inactive)
+        const { data: anyCoursesData } = await supabase
+          .from("courses")
+          .select("id")
+          .eq("owner_id", targetOwnerId)
+          .limit(1);
+        
+        if (!anyCoursesData || anyCoursesData.length === 0) {
+          // No courses at all for this editor - might be invalid link
+          setEditorNotFound(true);
+        }
+      }
+      
       setCourses(data || []);
     } catch (error) {
       console.error("Error loading courses:", error);
@@ -103,9 +130,8 @@ const FileRequest = () => {
     setIsSubmitting(true);
 
     try {
-      // Find the course to get the owner_id
-      const selectedCourse = courses.find(c => c.name === courseName);
-      const ownerId = selectedCourse?.owner_id || null;
+      // Use the target owner ID (from URL or admin default)
+      const ownerId = targetOwnerId;
 
       // Insert the request with owner_id to route to correct editor
       const { data: insertedRequest, error } = await supabase
@@ -177,6 +203,23 @@ const FileRequest = () => {
       setIsSubmitting(false);
     }
   };
+
+  // Show error if editor not found
+  if (editorNotFound) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md p-8 space-y-6 text-center">
+          <div className="w-16 h-16 mx-auto bg-destructive/10 rounded-full flex items-center justify-center">
+            <FileText className="w-8 h-8 text-destructive" />
+          </div>
+          <h1 className="text-2xl font-bold text-foreground">הדף לא נמצא</h1>
+          <p className="text-muted-foreground">
+            הקישור שהשתמשת בו אינו תקף או שהעורך אינו קיים במערכת.
+          </p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-background flex items-center justify-center p-4">
