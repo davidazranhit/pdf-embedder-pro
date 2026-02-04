@@ -45,6 +45,16 @@ const FileRequest = () => {
   const [formWarning, setFormWarning] = useState("כל ניסיון שיתוף או הפצת הקבצים מהווה הפרה חמורה של זכויות יוצרים ויטופל בהתאם");
   const { toast } = useToast();
 
+  const normalizeEmail = (value: string) => value.trim();
+
+  const normalizeIsraeliId = (value: string) => {
+    const digits = value.replace(/\D/g, "");
+    // Align with validateIsraeliID expectation (9 digits)
+    return digits.padStart(9, "0").slice(-9);
+  };
+
+  const normalizeCourseName = (value: string) => value.trim();
+
   useEffect(() => {
     loadFormTexts();
     loadCourses();
@@ -108,7 +118,12 @@ const FileRequest = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!email || !idNumber || !courseName) {
+    const normalizedEmail = normalizeEmail(email);
+    const normalizedIdNumber = normalizeIsraeliId(idNumber);
+    const normalizedCourseName = normalizeCourseName(courseName);
+    const normalizedNotes = notes.trim();
+
+    if (!normalizedEmail || !normalizedIdNumber || !normalizedCourseName) {
       toast({
         title: "שגיאה",
         description: "אנא מלא את כל השדות הנדרשים",
@@ -118,7 +133,7 @@ const FileRequest = () => {
     }
 
     // Validate Israeli ID
-    if (!validateIsraeliID(idNumber)) {
+    if (!validateIsraeliID(normalizedIdNumber)) {
       toast({
         title: "תעודת זהות שגויה",
         description: "אנא הזן תעודת זהות תקינה",
@@ -137,10 +152,10 @@ const FileRequest = () => {
       const { data: insertedRequest, error } = await supabase
         .from("file_requests")
         .insert({
-          email,
-          id_number: idNumber,
-          course_name: courseName,
-          notes: notes.trim() || null,
+          email: normalizedEmail,
+          id_number: normalizedIdNumber,
+          course_name: normalizedCourseName,
+          notes: normalizedNotes || null,
           owner_id: ownerId,
         })
         .select("id")
@@ -160,9 +175,9 @@ const FileRequest = () => {
       try {
         const { data: autoSendResult } = await supabase.functions.invoke("auto-send-trusted", {
           body: {
-            email,
-            id_number: idNumber,
-            course_name: courseName,
+            email: normalizedEmail,
+            id_number: normalizedIdNumber,
+            course_name: normalizedCourseName,
             request_id: insertedRequest.id,
           },
         });
@@ -246,6 +261,7 @@ const FileRequest = () => {
               placeholder="example@email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onBlur={() => setEmail((v) => normalizeEmail(v))}
               required
               dir="ltr"
               className="text-right"
@@ -259,7 +275,8 @@ const FileRequest = () => {
               type="text"
               placeholder="123456789"
               value={idNumber}
-              onChange={(e) => setIdNumber(e.target.value)}
+              onChange={(e) => setIdNumber(e.target.value.replace(/\D/g, "").slice(0, 9))}
+              onBlur={() => setIdNumber((v) => normalizeIsraeliId(v))}
               required
               maxLength={9}
               dir="ltr"
@@ -291,6 +308,7 @@ const FileRequest = () => {
                 placeholder="שם הקורס"
                 value={courseName}
                 onChange={(e) => setCourseName(e.target.value)}
+                onBlur={() => setCourseName((v) => normalizeCourseName(v))}
                 required
                 dir="rtl"
                 className="text-right"
