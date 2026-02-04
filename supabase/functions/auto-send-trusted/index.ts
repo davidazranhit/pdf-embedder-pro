@@ -10,7 +10,7 @@ interface CheckAndSendRequest {
   email: string;
   id_number: string;
   course_name: string;
-  request_id: string;
+  request_id?: string;
 }
 
 serve(async (req) => {
@@ -24,8 +24,20 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { email, id_number, course_name, request_id }: CheckAndSendRequest = await req.json();
+    const payload: CheckAndSendRequest = await req.json();
+    const email = (payload.email ?? "").trim().toLowerCase();
+    const id_number = (payload.id_number ?? "").replace(/\D/g, "").padStart(9, "0").slice(-9);
+    const course_name = (payload.course_name ?? "").trim();
+    const request_id = payload.request_id;
+
     console.log("Checking trusted combination for:", { email, id_number, course_name, request_id });
+
+    if (!email || !id_number || !course_name) {
+      return new Response(
+        JSON.stringify({ trusted: false, sent: false, error: "Missing required fields" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+      );
+    }
 
     // Check if this combination is trusted
     const { data: trustedData, error: trustedError } = await supabase
@@ -51,6 +63,28 @@ serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
       );
     }
+    // If request_id is not provided (public form insert can't RETURNING due to RLS),
+    // locate the latest matching request so we can update its status.
+    let effectiveRequestId = request_id;
+    if (!effectiveRequestId) {
+      const { data: latestReq, error: latestReqError } = await supabase
+        .from("file_requests")
+        .select("id")
+        .eq("email", email)
+        .eq("id_number", id_number)
+        .eq("course_name", course_name)
+        .order("submission_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (latestReqError) {
+        console.error("Error locating latest request:", latestReqError);
+      }
+
+      effectiveRequestId = latestReq?.id;
+      console.log("Effective request id:", effectiveRequestId);
+    }
+
 
     console.log("Trusted combination found! Auto-sending files...");
 
@@ -135,16 +169,20 @@ serve(async (req) => {
     }
 
     // Update request status to sent
-    const { error: updateError } = await supabase
-      .from("file_requests")
-      .update({
-        status: "sent",
-        sent_date: new Date().toISOString(),
-      })
-      .eq("id", request_id);
+    if (effectiveRequestId) {
+      const { error: updateError } = await supabase
+        .from("file_requests")
+        .update({
+          status: "sent",
+          sent_date: new Date().toISOString(),
+        })
+        .eq("id", effectiveRequestId);
 
-    if (updateError) {
-      console.error("Error updating request status:", updateError);
+      if (updateError) {
+        console.error("Error updating request status:", updateError);
+      }
+    } else {
+      console.warn("No request id to update status for (sent email anyway)");
     }
 
     console.log("Auto-send completed successfully!");
