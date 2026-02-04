@@ -23,6 +23,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/request-access" element={<FileRequest />} />
+          <Route path="/r/:editorId" element={<FileRequest />} />
           <Route path="/sys-admin/login" element={<Login />} />
           <Route
             path="/sys-admin"

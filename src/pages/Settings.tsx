@@ -828,6 +828,37 @@ const Settings = () => {
                     </p>
                   </div>
                   
+                  {/* Shareable Request Link */}
+                  <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
+                    <div className="space-y-2">
+                      <Label className="text-base font-medium">קישור לדף הבקשות שלך</Label>
+                      <p className="text-sm text-muted-foreground">
+                        שתף את הקישור הזה עם הלקוחות שלך. כל בקשה שתישלח דרך הקישור תגיע ישירות אליך.
+                      </p>
+                      <div className="flex gap-2">
+                        <Input
+                          readOnly
+                          value={`${window.location.origin}/r/${editorSettings?.user_id || ''}`}
+                          dir="ltr"
+                          className="text-left font-mono text-sm bg-background"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${window.location.origin}/r/${editorSettings?.user_id || ''}`);
+                            toast({
+                              title: "הקישור הועתק",
+                              description: "הקישור הועתק ללוח",
+                            });
+                          }}
+                        >
+                          העתק
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="sender-email">כתובת מייל שולח</Label>
