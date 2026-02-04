@@ -8,13 +8,16 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LogoutButton } from "@/components/LogoutButton";
-import { ArrowRight, Settings as SettingsIcon, BookOpen, Bell, Key, Webhook } from "lucide-react";
+import { ArrowRight, Settings as SettingsIcon, BookOpen, Bell, Key, Webhook, User } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CourseManager } from "@/components/CourseManager";
 import { ApiKeysManager } from "@/components/ApiKeysManager";
 import { WebhooksManager } from "@/components/WebhooksManager";
+import { useUserRole } from "@/hooks/useUserRole";
+import { useEditorSettings } from "@/hooks/useEditorSettings";
+
 interface WatermarkPosition {
   type: "top-right" | "top-left" | "bottom-right" | "bottom-left" | "center";
   enabled: boolean;
@@ -22,6 +25,8 @@ interface WatermarkPosition {
 
 const Settings = () => {
   const { toast } = useToast();
+  const { isAdmin, isEditor, isLoading: isRoleLoading } = useUserRole();
+  const { settings: editorSettings, updateSettings: updateEditorSettings } = useEditorSettings();
   const [watermarkPositions, setWatermarkPositions] = useState<WatermarkPosition[]>([
     { type: "top-right", enabled: true },
     { type: "top-left", enabled: false },
@@ -223,24 +228,40 @@ const Settings = () => {
             </div>
           </div>
 
-          <Tabs defaultValue="watermark" className="space-y-6" dir="rtl">
-            <TabsList className="grid w-full grid-cols-4 max-w-2xl mx-auto">
-              <TabsTrigger value="watermark" className="gap-2">
-                <SettingsIcon className="w-4 h-4" />
-                <span className="hidden sm:inline">Watermark</span>
-              </TabsTrigger>
+          <Tabs defaultValue={isEditor && !isAdmin ? "courses" : "watermark"} className="space-y-6" dir="rtl">
+            <TabsList className={`grid w-full max-w-2xl mx-auto ${isAdmin ? 'grid-cols-5' : 'grid-cols-2'}`}>
+              {isAdmin && (
+                <TabsTrigger value="watermark" className="gap-2">
+                  <SettingsIcon className="w-4 h-4" />
+                  <span className="hidden sm:inline">Watermark</span>
+                </TabsTrigger>
+              )}
               <TabsTrigger value="courses" className="gap-2">
                 <BookOpen className="w-4 h-4" />
                 <span className="hidden sm:inline">קורסים</span>
               </TabsTrigger>
-              <TabsTrigger value="api" className="gap-2">
-                <Key className="w-4 h-4" />
-                <span className="hidden sm:inline">API</span>
-              </TabsTrigger>
-              <TabsTrigger value="webhooks" className="gap-2">
-                <Webhook className="w-4 h-4" />
-                <span className="hidden sm:inline">Webhooks</span>
-              </TabsTrigger>
+              {isEditor && !isAdmin && (
+                <TabsTrigger value="my-settings" className="gap-2">
+                  <User className="w-4 h-4" />
+                  <span className="hidden sm:inline">הגדרות אישיות</span>
+                </TabsTrigger>
+              )}
+              {isAdmin && (
+                <>
+                  <TabsTrigger value="api" className="gap-2">
+                    <Key className="w-4 h-4" />
+                    <span className="hidden sm:inline">API</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="webhooks" className="gap-2">
+                    <Webhook className="w-4 h-4" />
+                    <span className="hidden sm:inline">Webhooks</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="alerts" className="gap-2">
+                    <Bell className="w-4 h-4" />
+                    <span className="hidden sm:inline">התראות</span>
+                  </TabsTrigger>
+                </>
+              )}
             </TabsList>
 
             <TabsContent value="watermark">
@@ -778,13 +799,114 @@ const Settings = () => {
               <CourseManager />
             </TabsContent>
 
-            <TabsContent value="api">
-              <ApiKeysManager />
-            </TabsContent>
+            {isEditor && !isAdmin && (
+              <TabsContent value="my-settings">
+                <Card className="p-8 shadow-lg border-border/50 space-y-6">
+                  <div>
+                    <h2 className="text-2xl font-semibold mb-6 text-foreground">
+                      הגדרות אישיות
+                    </h2>
+                    <p className="text-muted-foreground mb-6">
+                      הגדר את פרטי השולח עבור המיילים שנשלחים למשתמשים שלך
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="sender-email">כתובת מייל שולח</Label>
+                      <Input
+                        id="sender-email"
+                        type="email"
+                        placeholder="your@email.com"
+                        value={editorSettings?.sender_email || ""}
+                        onChange={(e) => updateEditorSettings({ sender_email: e.target.value })}
+                        dir="ltr"
+                        className="text-left"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        כתובת המייל שתופיע כשולח בעת שליחת קבצים ללקוחות
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="sender-name">שם השולח</Label>
+                      <Input
+                        id="sender-name"
+                        type="text"
+                        placeholder="שם העסק/הקורס"
+                        value={editorSettings?.sender_name || ""}
+                        onChange={(e) => updateEditorSettings({ sender_name: e.target.value })}
+                      />
+                    </div>
+                  </div>
 
-            <TabsContent value="webhooks">
-              <WebhooksManager />
-            </TabsContent>
+                  <Button onClick={() => {
+                    toast({
+                      title: "ההגדרות נשמרו",
+                      description: "הגדרות השולח עודכנו בהצלחה",
+                    });
+                  }}>
+                    שמור הגדרות
+                  </Button>
+                </Card>
+              </TabsContent>
+            )}
+
+            {isAdmin && (
+              <>
+                <TabsContent value="api">
+                  <ApiKeysManager />
+                </TabsContent>
+
+                <TabsContent value="webhooks">
+                  <WebhooksManager />
+                </TabsContent>
+
+                <TabsContent value="alerts">
+                  <Card className="p-8 shadow-lg border-border/50 space-y-6">
+                    <div>
+                      <h2 className="text-2xl font-semibold mb-6 text-foreground">
+                        <Bell className="w-6 h-6 inline-block ml-2" />
+                        הגדרות התראות
+                      </h2>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="admin-email">מייל מנהל להתראות</Label>
+                        <Input
+                          id="admin-email"
+                          type="email"
+                          value={adminEmail}
+                          onChange={(e) => setAdminEmail(e.target.value)}
+                          dir="ltr"
+                          className="text-left"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label>סף התראה לבקשות ממתינות: {pendingAlertThreshold}</Label>
+                        <Slider
+                          value={[pendingAlertThreshold]}
+                          onValueChange={(val) => setPendingAlertThreshold(val[0])}
+                          min={1}
+                          max={20}
+                          step={1}
+                          className="w-full"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          כאשר מספר הבקשות הממתינות יעבור את הסף, תישלח התראה למייל המנהל
+                        </p>
+                      </div>
+                    </div>
+
+                    <Button onClick={saveSettings} disabled={isSaving}>
+                      {isSaving ? "שומר..." : "שמור הגדרות"}
+                    </Button>
+                  </Card>
+                </TabsContent>
+              </>
+            )}
           </Tabs>
         </div>
       </div>

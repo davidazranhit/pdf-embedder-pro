@@ -6,11 +6,13 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, GripVertical } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useUserRole } from "@/hooks/useUserRole";
 
 interface Course {
   id: string;
   name: string;
   is_active: boolean;
+  owner_id: string | null;
 }
 
 export const CourseManager = () => {
@@ -19,10 +21,11 @@ export const CourseManager = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const { toast } = useToast();
+  const { userId, isAdmin, isEditor } = useUserRole();
 
   useEffect(() => {
     fetchCourses();
-  }, []);
+  }, [userId]);
 
   const fetchCourses = async () => {
     try {
@@ -57,9 +60,18 @@ export const CourseManager = () => {
 
     setIsAdding(true);
     try {
+      // Editors add courses with their owner_id, admins can add without owner
+      const insertData: { name: string; owner_id?: string } = { 
+        name: newCourseName.trim() 
+      };
+      
+      if (isEditor && userId) {
+        insertData.owner_id = userId;
+      }
+
       const { data, error } = await supabase
         .from("courses")
-        .insert({ name: newCourseName.trim() })
+        .insert(insertData)
         .select()
         .single();
 

@@ -49,7 +49,6 @@ import {
   Trash2, 
   RefreshCw,
   Crown,
-  Eye,
   Pencil
 } from "lucide-react";
 import { format } from "date-fns";
@@ -58,28 +57,22 @@ interface UserWithRole {
   id: string;
   user_id: string;
   email: string;
-  role: "admin" | "editor" | "viewer" | "user";
+  role: "admin" | "editor" | "user";
   created_at: string;
 }
 
 const ROLE_CONFIG = {
   admin: {
     label: "מנהל",
-    description: "גישה מלאה לכל המערכת",
+    description: "גישה מלאה - ניהול כל המערכת, צפייה בכל הנתונים",
     icon: Crown,
     color: "bg-amber-500 dark:bg-amber-600",
   },
   editor: {
     label: "עורך",
-    description: "יכול לנהל בקשות, תבניות וקורסים",
+    description: "אזור נפרד - קורסים, תבניות ובקשות משלו",
     icon: Pencil,
     color: "bg-blue-500 dark:bg-blue-600",
-  },
-  viewer: {
-    label: "צופה",
-    description: "יכול לצפות בלבד",
-    icon: Eye,
-    color: "bg-slate-500 dark:bg-slate-600",
   },
   user: {
     label: "משתמש",
@@ -100,7 +93,7 @@ const UserManagement = () => {
   // Form state
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [newRole, setNewRole] = useState<"admin" | "editor" | "viewer">("viewer");
+  const [newRole, setNewRole] = useState<"admin" | "editor">("editor");
   const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
@@ -247,7 +240,7 @@ const UserManagement = () => {
   const resetDialog = () => {
     setNewEmail("");
     setNewPassword("");
-    setNewRole("viewer");
+    setNewRole("editor");
     setIsDialogOpen(false);
   };
 
@@ -291,8 +284,8 @@ const UserManagement = () => {
           </div>
 
           {/* Role Legend */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {(["admin", "editor", "viewer"] as const).map((role) => {
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {(["admin", "editor"] as const).map((role) => {
               const config = ROLE_CONFIG[role];
               const Icon = config.icon;
               return (
@@ -379,13 +372,7 @@ const UserManagement = () => {
                             <SelectItem value="editor">
                               <div className="flex items-center gap-2">
                                 <Pencil className="w-4 h-4" />
-                                עורך - ניהול תוכן
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="viewer">
-                              <div className="flex items-center gap-2">
-                                <Eye className="w-4 h-4" />
-                                צופה - צפייה בלבד
+                                עורך - ניהול תוכן באזור נפרד
                               </div>
                             </SelectItem>
                           </SelectContent>
@@ -492,7 +479,6 @@ const UserManagement = () => {
                   <SelectContent>
                     <SelectItem value="admin">מנהל</SelectItem>
                     <SelectItem value="editor">עורך</SelectItem>
-                    <SelectItem value="viewer">צופה</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
