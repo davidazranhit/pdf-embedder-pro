@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import FileRequest from "./pages/FileRequest";
 import Settings from "./pages/Settings";
 import Statistics from "./pages/Statistics";
+import UserManagement from "./pages/UserManagement";
 import FileUnavailable from "./pages/FileUnavailable";
 import NotFound from "./pages/NotFound";
 
@@ -44,6 +45,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <Statistics />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sys-admin/users"
+            element={
+              <ProtectedRoute>
+                <UserManagement />
               </ProtectedRoute>
             }
           />
