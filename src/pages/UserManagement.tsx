@@ -110,23 +110,17 @@ const UserManagement = () => {
   const loadUsers = async () => {
     setIsLoading(true);
     try {
-      // Get all user roles with user info
-      const { data: roles, error } = await supabase
-        .from("user_roles")
-        .select("id, user_id, role, created_at")
-        .order("created_at", { ascending: false });
+      // Use edge function to get users with their actual emails
+      const response = await supabase.functions.invoke("list-users");
 
-      if (error) throw error;
+      if (response.error) throw response.error;
 
-      // For each role, we need to get the user email from auth.users
-      // Since we can't query auth.users directly, we'll use the admin API through an edge function
-      // For now, we'll show the user_id and role
-      const usersWithRoles: UserWithRole[] = (roles || []).map((role) => ({
-        id: role.id,
-        user_id: role.user_id,
-        email: role.user_id, // Will be replaced with actual email if we have it
-        role: role.role as "admin" | "editor" | "viewer" | "user",
-        created_at: role.created_at || new Date().toISOString(),
+      const usersWithRoles: UserWithRole[] = (response.data?.users || []).map((user: any) => ({
+        id: user.id,
+        user_id: user.user_id,
+        email: user.email,
+        role: user.role as "admin" | "editor" | "viewer" | "user",
+        created_at: user.created_at || new Date().toISOString(),
       }));
 
       setUsers(usersWithRoles);
@@ -442,8 +436,8 @@ const UserManagement = () => {
                   <TableBody>
                     {users.map((user) => (
                       <TableRow key={user.id}>
-                        <TableCell className="font-medium font-mono text-sm">
-                          {user.email.includes("@") ? user.email : `ID: ${user.user_id.substring(0, 8)}...`}
+                        <TableCell className="font-medium">
+                          {user.email}
                         </TableCell>
                         <TableCell>{getRoleBadge(user.role)}</TableCell>
                         <TableCell className="text-muted-foreground">
