@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { buildStoragePath } from "@/lib/utils";
-import { FileCheck, Send, Download, User, Inbox, Settings, BarChart3 } from "lucide-react";
+import { FileCheck, Send, Download, User, Inbox, Settings, BarChart3, Shield } from "lucide-react";
 
 interface Template {
   id: string;
@@ -515,6 +515,12 @@ ${links.map((l) => {
                   <Button variant="outline" className="flex items-center gap-2">
                     <BarChart3 className="w-4 h-4" />
                     סטטיסטיקה
+                  </Button>
+                </Link>
+                <Link to="/sys-admin/users">
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <Shield className="w-4 h-4" />
+                    משתמשים
                   </Button>
                 </Link>
               </div>
