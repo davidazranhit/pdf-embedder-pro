@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, FileText, Trash2, CheckCircle2, Circle, Settings, Pencil, X } from "lucide-react";
+import { useUserRole } from "@/hooks/useUserRole";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,6 +36,7 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('בסיסי נתונים');
   const { toast } = useToast();
+  const { userId, isAdmin, isEditor } = useUserRole();
 
   const defaultCategories = ['בסיסי נתונים', 'מונחה עצמים', 'חישוביות וסיבוכיות'];
   const [dbCategories, setDbCategories] = useState<string[]>([]);
@@ -59,9 +61,11 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
   };
 
   useEffect(() => {
-    fetchTemplates();
-    fetchCategories();
-  }, []);
+    if (userId) {
+      fetchTemplates();
+      fetchCategories();
+    }
+  }, [userId]);
 
   const fetchCategories = async () => {
     const { data, error } = await supabase
@@ -122,15 +126,21 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
 
       if (uploadError) throw uploadError;
 
-      // Save to database
+      // Save to database - add owner_id for editors
+      const insertData: { name: string; file_path: string; file_size: number; category: string; owner_id?: string } = {
+        name: file.name,
+        file_path: fileName,
+        file_size: file.size,
+        category: categoryToUse || selectedCategory,
+      };
+      
+      if (isEditor && userId) {
+        insertData.owner_id = userId;
+      }
+
       const { error: dbError } = await supabase
         .from("pdf_templates")
-        .insert({
-          name: file.name,
-          file_path: fileName,
-          file_size: file.size,
-          category: categoryToUse || selectedCategory,
-        });
+        .insert(insertData);
 
       if (dbError) throw dbError;
 
@@ -177,10 +187,16 @@ export const TemplateManager = ({ onTemplateSelect, selectedTemplates }: Templat
     }
     
     try {
-      // Save to database
+      // Save to database - add owner_id for editors
+      const insertData: { name: string; owner_id?: string } = { name: categoryName };
+      
+      if (isEditor && userId) {
+        insertData.owner_id = userId;
+      }
+      
       const { error } = await supabase
         .from("categories")
-        .insert({ name: categoryName });
+        .insert(insertData);
 
       if (error) throw error;
 

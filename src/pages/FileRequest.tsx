@@ -19,6 +19,7 @@ import {
 interface Course {
   id: string;
   name: string;
+  owner_id: string | null;
 }
 
 const FileRequest = () => {
@@ -61,9 +62,10 @@ const FileRequest = () => {
 
   const loadCourses = async () => {
     try {
+      // Load all active courses - RLS will filter by owner
       const { data, error } = await supabase
         .from("courses")
-        .select("id, name")
+        .select("id, name, owner_id")
         .eq("is_active", true)
         .order("created_at", { ascending: true });
 
@@ -101,7 +103,11 @@ const FileRequest = () => {
     setIsSubmitting(true);
 
     try {
-      // Insert the request
+      // Find the course to get the owner_id
+      const selectedCourse = courses.find(c => c.name === courseName);
+      const ownerId = selectedCourse?.owner_id || null;
+
+      // Insert the request with owner_id to route to correct editor
       const { data: insertedRequest, error } = await supabase
         .from("file_requests")
         .insert({
@@ -109,6 +115,7 @@ const FileRequest = () => {
           id_number: idNumber,
           course_name: courseName,
           notes: notes.trim() || null,
+          owner_id: ownerId,
         })
         .select("id")
         .single();

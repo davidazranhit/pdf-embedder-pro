@@ -100,18 +100,21 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          owner_id: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
+          owner_id?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
+          owner_id?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -122,6 +125,7 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          owner_id: string | null
           updated_at: string
         }
         Insert: {
@@ -129,6 +133,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
+          owner_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -136,7 +141,35 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          owner_id?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      editor_settings: {
+        Row: {
+          created_at: string
+          id: string
+          sender_email: string | null
+          sender_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          sender_email?: string | null
+          sender_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          sender_email?: string | null
+          sender_name?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -148,6 +181,7 @@ export type Database = {
           id: string
           id_number: string
           notes: string | null
+          owner_id: string | null
           sent_date: string | null
           status: Database["public"]["Enums"]["request_status"]
           submission_date: string
@@ -160,6 +194,7 @@ export type Database = {
           id?: string
           id_number: string
           notes?: string | null
+          owner_id?: string | null
           sent_date?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           submission_date?: string
@@ -172,6 +207,7 @@ export type Database = {
           id?: string
           id_number?: string
           notes?: string | null
+          owner_id?: string | null
           sent_date?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           submission_date?: string
@@ -187,6 +223,7 @@ export type Database = {
           file_size: number
           id: string
           name: string
+          owner_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -196,6 +233,7 @@ export type Database = {
           file_size: number
           id?: string
           name: string
+          owner_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -205,6 +243,7 @@ export type Database = {
           file_size?: number
           id?: string
           name?: string
+          owner_id?: string | null
           updated_at?: string | null
         }
         Relationships: []
