@@ -6,13 +6,15 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LogoutButton } from "@/components/LogoutButton";
-import { ArrowRight, Settings as SettingsIcon, BookOpen, Bell } from "lucide-react";
+import { ArrowRight, Settings as SettingsIcon, BookOpen, Bell, Key, Webhook } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CourseManager } from "@/components/CourseManager";
-
+import { ApiKeysManager } from "@/components/ApiKeysManager";
+import { WebhooksManager } from "@/components/WebhooksManager";
 interface WatermarkPosition {
   type: "top-right" | "top-left" | "bottom-right" | "bottom-left" | "center";
   enabled: boolean;
@@ -213,14 +215,35 @@ const Settings = () => {
                 <SettingsIcon className="w-12 h-12 text-primary-foreground" />
               </div>
               <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                הגדרות Watermark
+                הגדרות מערכת
               </h1>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                התאם את המראה והמיקום של ה-Watermarks הגלויים
+                ניהול הגדרות Watermarks, API ו-Webhooks
               </p>
             </div>
           </div>
 
+          <Tabs defaultValue="watermark" className="space-y-6" dir="rtl">
+            <TabsList className="grid w-full grid-cols-4 max-w-2xl mx-auto">
+              <TabsTrigger value="watermark" className="gap-2">
+                <SettingsIcon className="w-4 h-4" />
+                <span className="hidden sm:inline">Watermark</span>
+              </TabsTrigger>
+              <TabsTrigger value="courses" className="gap-2">
+                <BookOpen className="w-4 h-4" />
+                <span className="hidden sm:inline">קורסים</span>
+              </TabsTrigger>
+              <TabsTrigger value="api" className="gap-2">
+                <Key className="w-4 h-4" />
+                <span className="hidden sm:inline">API</span>
+              </TabsTrigger>
+              <TabsTrigger value="webhooks" className="gap-2">
+                <Webhook className="w-4 h-4" />
+                <span className="hidden sm:inline">Webhooks</span>
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="watermark">
           <div className="grid md:grid-cols-2 gap-8">
             {/* Settings Panel */}
             <Card className="p-8 shadow-lg border-border/50 space-y-8">
@@ -749,6 +772,20 @@ const Settings = () => {
               </div>
             </Card>
           </div>
+            </TabsContent>
+
+            <TabsContent value="courses">
+              <CourseManager />
+            </TabsContent>
+
+            <TabsContent value="api">
+              <ApiKeysManager />
+            </TabsContent>
+
+            <TabsContent value="webhooks">
+              <WebhooksManager />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>

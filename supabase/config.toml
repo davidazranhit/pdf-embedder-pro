@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.notify-pending-requests]
 verify_jwt = false
+
+[functions.trigger-webhook]
+verify_jwt = false
+
+[functions.api-gateway]
+verify_jwt = false
