@@ -1,0 +1,1 @@
+ALTER TABLE public.download_logs ADD COLUMN id_number text;
