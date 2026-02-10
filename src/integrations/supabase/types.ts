@@ -212,6 +212,7 @@ export type Database = {
           id_number: string
           notes: string | null
           owner_id: string | null
+          reminder_sent_at: string | null
           sent_date: string | null
           status: Database["public"]["Enums"]["request_status"]
           submission_date: string
@@ -225,6 +226,7 @@ export type Database = {
           id_number: string
           notes?: string | null
           owner_id?: string | null
+          reminder_sent_at?: string | null
           sent_date?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           submission_date?: string
@@ -238,6 +240,7 @@ export type Database = {
           id_number?: string
           notes?: string | null
           owner_id?: string | null
+          reminder_sent_at?: string | null
           sent_date?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           submission_date?: string
@@ -408,6 +411,10 @@ export type Database = {
           cover_id_label: string
           cover_success_text: string
           created_at: string | null
+          download_reminder_body: string | null
+          download_reminder_days: number | null
+          download_reminder_enabled: boolean | null
+          download_reminder_subject: string | null
           email_body: string | null
           email_subject: string | null
           font_size: number
@@ -433,6 +440,10 @@ export type Database = {
           cover_id_label?: string
           cover_success_text?: string
           created_at?: string | null
+          download_reminder_body?: string | null
+          download_reminder_days?: number | null
+          download_reminder_enabled?: boolean | null
+          download_reminder_subject?: string | null
           email_body?: string | null
           email_subject?: string | null
           font_size?: number
@@ -458,6 +469,10 @@ export type Database = {
           cover_id_label?: string
           cover_success_text?: string
           created_at?: string | null
+          download_reminder_body?: string | null
+          download_reminder_days?: number | null
+          download_reminder_enabled?: boolean | null
+          download_reminder_subject?: string | null
           email_body?: string | null
           email_subject?: string | null
           font_size?: number
