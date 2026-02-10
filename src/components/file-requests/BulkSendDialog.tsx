@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, Send, Check, Eye, Users, Mail, AlertTriangle } from "lucide-react";
+import { FileText, Send, Check, Eye, Users, Mail, AlertTriangle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 
@@ -51,7 +51,7 @@ interface BulkSendDialogProps {
   categories: Category[];
   onSend: (requests: FileRequest[], templateIds: string[]) => Promise<void>;
   isSending: boolean;
-  sendProgress: { current: number; total: number; currentEmail?: string };
+  sendProgress: { current: number; total: number; currentEmail?: string; step?: string };
 }
 
 export const BulkSendDialog = ({
@@ -291,15 +291,21 @@ export const BulkSendDialog = ({
           {isSending && (
             <div className="space-y-3 p-4 bg-primary/5 rounded-xl">
               <div className="flex items-center justify-between text-sm">
-                <span className="font-medium">מעבד בקשות...</span>
-                <span className="text-muted-foreground">
-                  {sendProgress.current} / {sendProgress.total}
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                  <span className="font-medium">
+                    בקשה {Math.min(sendProgress.current + 1, sendProgress.total)} מתוך {sendProgress.total}
+                  </span>
+                </span>
+                <span className="text-muted-foreground font-mono">
+                  {Math.round((sendProgress.current / sendProgress.total) * 100)}%
                 </span>
               </div>
               <Progress value={(sendProgress.current / sendProgress.total) * 100} />
               {sendProgress.currentEmail && (
                 <p className="text-xs text-muted-foreground truncate">
-                  שולח אל: {sendProgress.currentEmail}
+                  {sendProgress.step && <span className="font-medium">{sendProgress.step} </span>}
+                  {sendProgress.currentEmail}
                 </p>
               )}
             </div>
@@ -317,8 +323,8 @@ export const BulkSendDialog = ({
             >
               {isSending ? (
                 <span className="flex items-center gap-2">
-                  <span className="animate-spin">⏳</span>
-                  מעבד...
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {sendProgress.step || "מעבד..."}
                 </span>
               ) : (
                 <span className="flex items-center gap-2">

@@ -128,7 +128,7 @@ export const FileRequestsManager = () => {
   const [selectedRequestIds, setSelectedRequestIds] = useState<Set<string>>(new Set());
   const [showBulkSendDialog, setShowBulkSendDialog] = useState(false);
   const [isBulkSending, setIsBulkSending] = useState(false);
-  const [bulkSendProgress, setBulkSendProgress] = useState({ current: 0, total: 0, currentEmail: "" });
+  const [bulkSendProgress, setBulkSendProgress] = useState({ current: 0, total: 0, currentEmail: "", step: "" });
   
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -820,7 +820,7 @@ export const FileRequestsManager = () => {
     if (requestsToSend.length === 0 || templateIds.length === 0) return;
 
     setIsBulkSending(true);
-    setBulkSendProgress({ current: 0, total: requestsToSend.length, currentEmail: "" });
+    setBulkSendProgress({ current: 0, total: requestsToSend.length, currentEmail: "", step: "" });
 
     const selectedTemplatesList = templates.filter(t => templateIds.includes(t.id));
     const allFileIds = selectedTemplatesList.map(t => t.file_path);
@@ -830,10 +830,11 @@ export const FileRequestsManager = () => {
 
     for (let i = 0; i < requestsToSend.length; i++) {
       const request = requestsToSend[i];
-      setBulkSendProgress({ current: i + 1, total: requestsToSend.length, currentEmail: request.email });
 
       try {
-        // Process watermarks
+        // Step 1: Watermark
+        setBulkSendProgress({ current: i, total: requestsToSend.length, currentEmail: request.email, step: "מעבד סימני מים..." });
+
         const { data: processData, error: processError } = await supabase.functions.invoke(
           "process-watermark",
           {
@@ -856,7 +857,9 @@ export const FileRequestsManager = () => {
           originalName: f.originalName,
         }));
 
-        // Send email
+        // Step 2: Send email
+        setBulkSendProgress({ current: i, total: requestsToSend.length, currentEmail: request.email, step: "שולח מייל..." });
+
         const { error: sendError } = await supabase.functions.invoke("send-watermarked-files", {
           body: {
             email: request.email,
@@ -871,7 +874,9 @@ export const FileRequestsManager = () => {
           continue;
         }
 
-        // Update request status
+        // Step 3: Update status
+        setBulkSendProgress({ current: i, total: requestsToSend.length, currentEmail: request.email, step: "מעדכן סטטוס..." });
+
         await supabase
           .from("file_requests")
           .update({
@@ -881,6 +886,7 @@ export const FileRequestsManager = () => {
           .eq("id", request.id);
 
         successCount++;
+        setBulkSendProgress({ current: i + 1, total: requestsToSend.length, currentEmail: request.email, step: "הושלם ✓" });
       } catch (error) {
         console.error("Error processing request", request.id, error);
         errorCount++;
