@@ -96,7 +96,7 @@ serve(async (req) => {
         // Create download URL using our one-time download function
         const actualFileId = typeof fileId === 'string' ? fileId : '';
         const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-        const downloadUrl = `${supabaseUrl}/functions/v1/download-file?path=${encodeURIComponent(actualFileId)}&name=${encodeURIComponent(finalFileName)}`;
+        const downloadUrl = `${supabaseUrl}/functions/v1/download-file?path=${encodeURIComponent(actualFileId)}&name=${encodeURIComponent(finalFileName)}&email=${encodeURIComponent(email)}`;
 
         links.push({ name: finalFileName, url: downloadUrl });
       } catch (err) {

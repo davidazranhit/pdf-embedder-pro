@@ -35,12 +35,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BarChart3, ArrowRight, Search, Users, Mail, FileText, Trash2, ArrowUpDown, History } from "lucide-react";
+import { BarChart3, ArrowRight, Search, Users, Mail, FileText, Trash2, ArrowUpDown, History, Download } from "lucide-react";
 import { RequestsTrendChart } from "@/components/statistics/RequestsTrendChart";
 import { CourseDistributionChart } from "@/components/statistics/CourseDistributionChart";
 import { ProcessingTimeStats } from "@/components/statistics/ProcessingTimeStats";
 import { StatusDistributionChart } from "@/components/statistics/StatusDistributionChart";
 import { AuditLogViewer } from "@/components/AuditLogViewer";
+import { DownloadLogsViewer } from "@/components/statistics/DownloadLogsViewer";
 
 interface RequestData {
   id: string;
@@ -272,10 +273,14 @@ const Statistics = () => {
           </div>
 
           <Tabs defaultValue="overview" className="space-y-6" dir="rtl">
-            <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
+            <TabsList className="grid w-full grid-cols-3 max-w-lg mx-auto">
               <TabsTrigger value="overview" className="gap-2">
                 <BarChart3 className="w-4 h-4" />
                 סקירה כללית
+              </TabsTrigger>
+              <TabsTrigger value="downloads" className="gap-2">
+                <Download className="w-4 h-4" />
+                הורדות
               </TabsTrigger>
               <TabsTrigger value="audit" className="gap-2">
                 <History className="w-4 h-4" />
@@ -463,6 +468,10 @@ const Statistics = () => {
               )}
             </div>
           </Card>
+            </TabsContent>
+
+            <TabsContent value="downloads">
+              <DownloadLogsViewer />
             </TabsContent>
 
             <TabsContent value="audit">
