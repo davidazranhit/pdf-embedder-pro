@@ -6,6 +6,7 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LogoutButton } from "@/components/LogoutButton";
 import { ArrowRight, Settings as SettingsIcon, BookOpen, Bell, Key, Webhook, User } from "lucide-react";
@@ -54,6 +55,10 @@ const Settings = () => {
   const [coverSuccessText, setCoverSuccessText] = useState<string>("בהצלחה!");
   const [adminEmail, setAdminEmail] = useState<string>("davidazran014@gmail.com");
   const [pendingAlertThreshold, setPendingAlertThreshold] = useState<number>(5);
+  const [downloadReminderEnabled, setDownloadReminderEnabled] = useState<boolean>(false);
+  const [downloadReminderDays, setDownloadReminderDays] = useState<number>(2);
+  const [downloadReminderSubject, setDownloadReminderSubject] = useState<string>("תזכורת: הקבצים שלך ממתינים להורדה");
+  const [downloadReminderBody, setDownloadReminderBody] = useState<string>("שלום,\n\nשלחנו לך קבצים לפני מספר ימים, אך שמנו לב שטרם הורדת אותם.\n\nהקבצים זמינים להורדה למשך 3 ימים בלבד מרגע השליחה, אז מומלץ להוריד אותם בהקדם.\n\nאם כבר הורדת את הקבצים, ניתן להתעלם מהודעה זו.");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
@@ -92,6 +97,10 @@ const Settings = () => {
         setCoverSuccessText(data.cover_success_text ?? "בהצלחה!");
         setAdminEmail(data.admin_email ?? "davidazran014@gmail.com");
         setPendingAlertThreshold(data.pending_alert_threshold ?? 5);
+        setDownloadReminderEnabled((data as any).download_reminder_enabled ?? false);
+        setDownloadReminderDays((data as any).download_reminder_days ?? 2);
+        setDownloadReminderSubject((data as any).download_reminder_subject ?? "תזכורת: הקבצים שלך ממתינים להורדה");
+        setDownloadReminderBody((data as any).download_reminder_body ?? "שלום,\n\nשלחנו לך קבצים לפני מספר ימים, אך שמנו לב שטרם הורדת אותם.\n\nהקבצים זמינים להורדה למשך 3 ימים בלבד מרגע השליחה, אז מומלץ להוריד אותם בהקדם.\n\nאם כבר הורדת את הקבצים, ניתן להתעלם מהודעה זו.");
       }
     } catch (error) {
       console.error("Error loading settings:", error);
@@ -146,7 +155,11 @@ const Settings = () => {
           cover_success_text: coverSuccessText,
           admin_email: adminEmail,
           pending_alert_threshold: pendingAlertThreshold,
-        })
+          download_reminder_enabled: downloadReminderEnabled,
+          download_reminder_days: downloadReminderDays,
+          download_reminder_subject: downloadReminderSubject,
+          download_reminder_body: downloadReminderBody,
+        } as any)
         .eq("id", "00000000-0000-0000-0000-000000000001");
 
       if (error) throw error;
@@ -612,6 +625,70 @@ const Settings = () => {
                       כשמספר הבקשות הממתינות יגיע ל-{pendingAlertThreshold} או יותר, תישלח התראה למייל
                     </p>
                   </div>
+                </div>
+
+                {/* Download Reminders Section */}
+                <div className="pt-6 border-t border-border">
+                  <h3 className="text-xl font-semibold mb-4 text-foreground flex items-center gap-2">
+                    <Bell className="w-5 h-5" />
+                    תזכורות הורדה
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    שלח תזכורת אוטומטית למי שקיבל קבצים אך לא הוריד אותם
+                  </p>
+
+                  <div className="flex items-center justify-between mb-6 p-4 bg-muted/50 rounded-xl">
+                    <div>
+                      <Label className="text-base font-medium">הפעל תזכורות אוטומטיות</Label>
+                      <p className="text-sm text-muted-foreground">
+                        תזכורת תישלח פעם ביום למי שלא הוריד את הקבצים
+                      </p>
+                    </div>
+                    <Switch
+                      checked={downloadReminderEnabled}
+                      onCheckedChange={setDownloadReminderEnabled}
+                    />
+                  </div>
+
+                  {downloadReminderEnabled && (
+                    <div className="space-y-4">
+                      <div className="space-y-3">
+                        <Label className="text-base font-medium">
+                          שלח תזכורת אחרי: {downloadReminderDays} ימים
+                        </Label>
+                        <Slider
+                          value={[downloadReminderDays]}
+                          onValueChange={(val) => setDownloadReminderDays(val[0])}
+                          min={1}
+                          max={3}
+                          step={1}
+                          className="w-full"
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          תזכורת תישלח {downloadReminderDays} ימים אחרי שליחת הקבצים (קבצים נמחקים אחרי 3 ימים)
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-base font-medium">נושא מייל תזכורת</Label>
+                        <Input
+                          value={downloadReminderSubject}
+                          onChange={(e) => setDownloadReminderSubject(e.target.value)}
+                          dir="rtl"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-base font-medium">תוכן מייל תזכורת</Label>
+                        <Textarea
+                          value={downloadReminderBody}
+                          onChange={(e) => setDownloadReminderBody(e.target.value)}
+                          className="min-h-[120px]"
+                          dir="rtl"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Courses Management Section */}
