@@ -10,6 +10,7 @@ interface SendEmailRequest {
   email: string;
   fileIds: string[];
   courseName?: string;
+  idNumber?: string;
 }
 
 serve(async (req) => {
@@ -32,8 +33,8 @@ serve(async (req) => {
       );
     }
 
-    const { email, fileIds, courseName }: SendEmailRequest = await req.json();
-    console.log("Sending files to:", email, "Files:", fileIds, "Course:", courseName);
+    const { email, fileIds, courseName, idNumber }: SendEmailRequest = await req.json();
+    console.log("Sending files to:", email, "ID:", idNumber, "Files:", fileIds, "Course:", courseName);
 
     // Load email template settings from database
     const { data: settings } = await supabase
@@ -96,7 +97,7 @@ serve(async (req) => {
         // Create download URL using our one-time download function
         const actualFileId = typeof fileId === 'string' ? fileId : '';
         const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-        const downloadUrl = `${supabaseUrl}/functions/v1/download-file?path=${encodeURIComponent(actualFileId)}&name=${encodeURIComponent(finalFileName)}&email=${encodeURIComponent(email)}`;
+        const downloadUrl = `${supabaseUrl}/functions/v1/download-file?path=${encodeURIComponent(actualFileId)}&name=${encodeURIComponent(finalFileName)}&email=${encodeURIComponent(email)}${idNumber ? `&id=${encodeURIComponent(idNumber)}` : ''}`;
 
         links.push({ name: finalFileName, url: downloadUrl });
       } catch (err) {

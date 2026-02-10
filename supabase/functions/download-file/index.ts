@@ -78,19 +78,18 @@ serve(async (req) => {
 
     // Log the download
     try {
-      const email = filePath.split('/').pop()?.match(/_([^_]+)\.pdf$/)?.[1] || '';
-      // Try to extract email from the processed filename pattern: templateName_email.pdf
-      // Or use query param if available
-      const downloaderEmail = url.searchParams.get("email") || decodeURIComponent(email).replace(/\+/g, ' ');
+      const downloaderEmail = url.searchParams.get("email") || "unknown";
+      const idNumber = url.searchParams.get("id") || null;
       
       await supabase.from("download_logs").insert({
-        email: downloaderEmail || "unknown",
+        email: decodeURIComponent(downloaderEmail),
+        id_number: idNumber ? decodeURIComponent(idNumber) : null,
         file_name: fileName,
         file_path: filePath,
         ip_address: req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || null,
         user_agent: req.headers.get("user-agent") || null,
       });
-      console.log("Download logged for:", downloaderEmail, fileName);
+      console.log("Download logged for:", downloaderEmail, "ID:", idNumber, fileName);
     } catch (logError) {
       // Don't block the download if logging fails
       console.error("Failed to log download:", logError);

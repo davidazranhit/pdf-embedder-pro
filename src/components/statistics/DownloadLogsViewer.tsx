@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 interface DownloadLog {
   id: string;
   email: string;
+  id_number: string | null;
   file_name: string;
   file_path: string;
   downloaded_at: string;
@@ -51,7 +52,8 @@ export const DownloadLogsViewer = () => {
     ? logs.filter(
         (l) =>
           l.email.toLowerCase().includes(search.toLowerCase()) ||
-          l.file_name.toLowerCase().includes(search.toLowerCase())
+          l.file_name.toLowerCase().includes(search.toLowerCase()) ||
+          (l.id_number && l.id_number.includes(search.trim()))
       )
     : logs;
 
@@ -147,6 +149,7 @@ export const DownloadLogsViewer = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="text-right">מייל</TableHead>
+                    <TableHead className="text-right">תעודת זהות</TableHead>
                     <TableHead className="text-right">שם קובץ</TableHead>
                     <TableHead className="text-right">תאריך הורדה</TableHead>
                     <TableHead className="text-right">IP</TableHead>
@@ -156,6 +159,7 @@ export const DownloadLogsViewer = () => {
                   {filteredLogs.map((log) => (
                     <TableRow key={log.id}>
                       <TableCell className="font-medium">{log.email}</TableCell>
+                      <TableCell className="font-mono text-sm">{log.id_number || "-"}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs font-normal max-w-[200px] truncate">
                           {log.file_name}

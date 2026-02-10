@@ -632,6 +632,7 @@ export const FileRequestsManager = () => {
           email: sendingRequest.email,
           fileIds: processedFiles,
           courseName: sendingRequest.course_name,
+          idNumber: sendingRequest.id_number,
         },
       });
 
@@ -865,6 +866,7 @@ export const FileRequestsManager = () => {
             email: request.email,
             fileIds: processedFiles,
             courseName: request.course_name,
+            idNumber: request.id_number,
           },
         });
 

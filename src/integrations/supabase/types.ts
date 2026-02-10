@@ -153,6 +153,7 @@ export type Database = {
           file_name: string
           file_path: string
           id: string
+          id_number: string | null
           ip_address: string | null
           user_agent: string | null
         }
@@ -162,6 +163,7 @@ export type Database = {
           file_name: string
           file_path: string
           id?: string
+          id_number?: string | null
           ip_address?: string | null
           user_agent?: string | null
         }
@@ -171,6 +173,7 @@ export type Database = {
           file_name?: string
           file_path?: string
           id?: string
+          id_number?: string | null
           ip_address?: string | null
           user_agent?: string | null
         }
