@@ -76,6 +76,26 @@ serve(async (req) => {
     // Convert blob to ArrayBuffer
     const arrayBuffer = await fileData.arrayBuffer();
 
+    // Log the download
+    try {
+      const email = filePath.split('/').pop()?.match(/_([^_]+)\.pdf$/)?.[1] || '';
+      // Try to extract email from the processed filename pattern: templateName_email.pdf
+      // Or use query param if available
+      const downloaderEmail = url.searchParams.get("email") || decodeURIComponent(email).replace(/\+/g, ' ');
+      
+      await supabase.from("download_logs").insert({
+        email: downloaderEmail || "unknown",
+        file_name: fileName,
+        file_path: filePath,
+        ip_address: req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || null,
+        user_agent: req.headers.get("user-agent") || null,
+      });
+      console.log("Download logged for:", downloaderEmail, fileName);
+    } catch (logError) {
+      // Don't block the download if logging fails
+      console.error("Failed to log download:", logError);
+    }
+
     // Files are kept for 3 days and cleaned up by the cleanup-old-files function
     // Multiple downloads are allowed within this period
 
