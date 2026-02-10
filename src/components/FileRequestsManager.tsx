@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Send, Filter, Calendar as CalendarIcon, X, Users, Check, Mail, User, BookOpen, Clock, MessageSquare, ChevronDown, ShieldCheck, Eye, AlertTriangle, Ban, RotateCcw } from "lucide-react";
+import { FileText, Send, Filter, Calendar as CalendarIcon, X, Users, Check, Mail, User, BookOpen, Clock, MessageSquare, ChevronDown, ShieldCheck, Eye, AlertTriangle, Ban, RotateCcw, Loader2 } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -122,6 +122,7 @@ export const FileRequestsManager = () => {
   const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
   const [sendingRequest, setSendingRequest] = useState<FileRequest | null>(null);
   const [isSendingFiles, setIsSendingFiles] = useState(false);
+  const [sendProgress, setSendProgress] = useState<{ step: string; percent: number }>({ step: "", percent: 0 });
   
   // Bulk selection state
   const [selectedRequestIds, setSelectedRequestIds] = useState<Set<string>>(new Set());
@@ -588,15 +589,12 @@ export const FileRequestsManager = () => {
         return;
       }
 
-      toast({
-        title: "מעבד קבצים",
-        description: `מעבד ${selectedTemplatesList.length} קבצים...`,
-      });
-
       // Collect all file paths
       const allFileIds = selectedTemplatesList.map((template) => template.file_path);
 
-      // Process watermarks
+      // Step 1: Processing watermarks
+      setSendProgress({ step: "מעבד סימני מים...", percent: 15 });
+
       const { data: processData, error: processError } = await supabase.functions.invoke(
         "process-watermark",
         {
@@ -618,13 +616,17 @@ export const FileRequestsManager = () => {
         return;
       }
 
+      setSendProgress({ step: "קבצים עובדו בהצלחה!", percent: 60 });
+
       // Extract processed file info
       const processedFiles = processData.files.map((f: any) => ({
         processedId: f.processedId,
         originalName: f.originalName
       }));
 
-      // Send email
+      // Step 2: Sending email
+      setSendProgress({ step: "שולח מייל...", percent: 75 });
+
       const { error: sendError } = await supabase.functions.invoke("send-watermarked-files", {
         body: {
           email: sendingRequest.email,
@@ -643,7 +645,9 @@ export const FileRequestsManager = () => {
         return;
       }
 
-      // Update request status
+      // Step 3: Updating status
+      setSendProgress({ step: "מעדכן סטטוס...", percent: 90 });
+
       await supabase
         .from("file_requests")
         .update({
@@ -651,6 +655,8 @@ export const FileRequestsManager = () => {
           sent_date: new Date().toISOString(),
         })
         .eq("id", sendingRequest.id);
+
+      setSendProgress({ step: "הושלם! ✓", percent: 100 });
 
       toast({
         title: "הצלחה",
@@ -671,6 +677,7 @@ export const FileRequestsManager = () => {
       });
     } finally {
       setIsSendingFiles(false);
+      setSendProgress({ step: "", percent: 0 });
     }
   };
 
@@ -1067,6 +1074,25 @@ export const FileRequestsManager = () => {
               </div>
             )}
 
+            {/* Progress Bar */}
+            {isSendingFiles && (
+              <div className="space-y-2 p-4 bg-muted/50 rounded-xl">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                    {sendProgress.step}
+                  </span>
+                  <span className="text-muted-foreground font-mono">{sendProgress.percent}%</span>
+                </div>
+                <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
+                  <div
+                    className="bg-primary h-2.5 rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${sendProgress.percent}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="flex gap-3 justify-end pt-4 border-t">
               <Button
@@ -1088,8 +1114,8 @@ export const FileRequestsManager = () => {
               >
                 {isSendingFiles ? (
                   <span className="flex items-center gap-2">
-                    <span className="animate-spin">⏳</span>
-                    מעבד...
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {sendProgress.step}
                   </span>
                 ) : (
                   <span className="flex items-center gap-2">
