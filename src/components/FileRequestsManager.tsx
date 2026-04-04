@@ -627,20 +627,23 @@ export const FileRequestsManager = () => {
       // Step 2: Sending email
       setSendProgress({ step: "שולח מייל...", percent: 75 });
 
-      const { error: sendError } = await supabase.functions.invoke("send-watermarked-files", {
+      const { error: sendError } = await invokeWithRetry({
+        functionName: "send-watermarked-files",
         body: {
           email: sendingRequest.email,
           fileIds: processedFiles,
           courseName: sendingRequest.course_name,
           idNumber: sendingRequest.id_number,
         },
+        timeoutMs: 60_000,
+        retries: 1,
       });
 
       if (sendError) {
         console.error("Error sending email:", sendError);
         toast({
           title: "שגיאה",
-          description: "שגיאה בשליחת המייל",
+          description: sendError.message || "שגיאה בשליחת המייל",
           variant: "destructive",
         });
         return;
