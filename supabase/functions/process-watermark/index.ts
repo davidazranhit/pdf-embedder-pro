@@ -437,20 +437,14 @@ serve(async (req) => {
     let filesOut: { originalId?: string; processedId: string; originalName?: string }[] = [];
 
     if (filePaths.length > 0) {
-      // Process files in parallel (up to all at once)
-      const results = await Promise.allSettled(
-        filePaths.map(async (fp) => {
+      // Process files sequentially to avoid memory/timeout issues with large batches
+      for (const fp of filePaths) {
+        try {
           const displayName = templateNameMap.get(fp);
           const processedId = await processOne(fp, displayName);
-          return { originalId: fp, processedId, originalName: displayName };
-        })
-      );
-
-      for (const result of results) {
-        if (result.status === 'fulfilled') {
-          filesOut.push(result.value);
-        } else {
-          console.error('Error processing file:', result.reason);
+          filesOut.push({ originalId: fp, processedId, originalName: displayName });
+        } catch (err) {
+          console.error('Error processing file:', fp, err);
         }
       }
     } else if (singleFilePath) {
