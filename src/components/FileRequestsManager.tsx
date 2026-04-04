@@ -839,16 +839,16 @@ export const FileRequestsManager = () => {
         // Step 1: Watermark
         setBulkSendProgress({ current: i, total: requestsToSend.length, currentEmail: request.email, step: "מעבד סימני מים..." });
 
-        const { data: processData, error: processError } = await supabase.functions.invoke(
-          "process-watermark",
-          {
-            body: {
-              fileIds: allFileIds,
-              email: request.email,
-              userId: request.id_number,
-            },
-          }
-        );
+        const { data: processData, error: processError } = await invokeWithRetry({
+          functionName: "process-watermark",
+          body: {
+            fileIds: allFileIds,
+            email: request.email,
+            userId: request.id_number,
+          },
+          timeoutMs: 150_000,
+          retries: 1,
+        });
 
         if (processError || !processData?.files || processData.files.length === 0) {
           console.error("Error processing watermarks for", request.email, processError);
@@ -864,13 +864,16 @@ export const FileRequestsManager = () => {
         // Step 2: Send email
         setBulkSendProgress({ current: i, total: requestsToSend.length, currentEmail: request.email, step: "שולח מייל..." });
 
-        const { error: sendError } = await supabase.functions.invoke("send-watermarked-files", {
+        const { error: sendError } = await invokeWithRetry({
+          functionName: "send-watermarked-files",
           body: {
             email: request.email,
             fileIds: processedFiles,
             courseName: request.course_name,
             idNumber: request.id_number,
           },
+          timeoutMs: 60_000,
+          retries: 1,
         });
 
         if (sendError) {
