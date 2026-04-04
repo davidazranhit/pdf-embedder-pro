@@ -593,25 +593,24 @@ export const FileRequestsManager = () => {
       // Collect all file paths
       const allFileIds = selectedTemplatesList.map((template) => template.file_path);
 
-      // Step 1: Processing watermarks
       setSendProgress({ step: "מעבד סימני מים...", percent: 15 });
 
-      const { data: processData, error: processError } = await supabase.functions.invoke(
-        "process-watermark",
-        {
-          body: {
-            fileIds: allFileIds,
-            email: sendingRequest.email,
-            userId: sendingRequest.id_number,
-          },
-        }
-      );
+      const { data: processData, error: processError } = await invokeWithRetry({
+        functionName: "process-watermark",
+        body: {
+          fileIds: allFileIds,
+          email: sendingRequest.email,
+          userId: sendingRequest.id_number,
+        },
+        timeoutMs: 150_000, // 2.5 minutes for watermark processing
+        retries: 1,
+      });
 
       if (processError || !processData?.files || processData.files.length === 0) {
         console.error("Error processing watermarks:", processError);
         toast({
           title: "שגיאה",
-          description: "לא הצלחנו לעבד את הקבצים",
+          description: processError?.message || "לא הצלחנו לעבד את הקבצים. נסה שוב.",
           variant: "destructive",
         });
         return;
