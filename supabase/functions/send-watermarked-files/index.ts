@@ -152,7 +152,16 @@ serve(async (req) => {
     if (!emailResponse.ok) {
       const errorData = await emailResponse.json();
       console.error('Brevo API error:', errorData);
-      throw new Error(`Failed to send email: ${JSON.stringify(errorData)}`);
+      
+      // Return a user-friendly error instead of throwing (which causes 500)
+      const userMessage = errorData?.code === 'unauthorized' 
+        ? 'שגיאת הרשאה בשירות המיילים (Brevo). יש לבדוק הגדרות IP מורשים בחשבון Brevo.'
+        : `שגיאה בשליחת מייל: ${errorData?.message || 'Unknown error'}`;
+      
+      return new Response(
+        JSON.stringify({ error: userMessage, brevoError: errorData }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
     }
 
     const emailResult = await emailResponse.json();
