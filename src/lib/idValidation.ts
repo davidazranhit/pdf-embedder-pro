@@ -16,6 +16,17 @@ export function validateIsraeliID(id: string): boolean {
   // Pad with zeros if needed (for IDs that are less than 9 digits when written)
   const paddedId = cleanId.padStart(9, '0');
   
+  // Reject all-zeros ID (000000000)
+  if (/^0+$/.test(paddedId)) {
+    return false;
+  }
+
+  // Israeli IDs always start with digit 0-3 (after padding to 9 digits).
+  // Any ID whose first digit is 4 or higher is invalid.
+  if (parseInt(paddedId[0], 10) >= 4) {
+    return false;
+  }
+
   // Calculate checksum using Israeli ID algorithm
   let sum = 0;
   for (let i = 0; i < 9; i++) {
