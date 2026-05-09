@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Send, Filter, Calendar as CalendarIcon, X, Users, Check, Mail, User, BookOpen, Clock, MessageSquare, ChevronDown, ShieldCheck, Eye, AlertTriangle, Ban, RotateCcw, Loader2 } from "lucide-react";
+import { FileText, Send, Filter, Calendar as CalendarIcon, X, Users, Check, Mail, User, BookOpen, Clock, MessageSquare, ChevronDown, ShieldCheck, Eye, AlertTriangle, Ban, RotateCcw, Loader2, Copy } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -228,6 +228,29 @@ export const FileRequestsManager = () => {
 
   const handleFilterByUser = (request: FileRequest, type: 'email' | 'id_number') => {
     setUserFilter({ type, value: type === 'email' ? request.email : request.id_number });
+  };
+
+  const handleCopyEmail = async (e: React.MouseEvent, email: string) => {
+    e.stopPropagation();
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(email);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = email;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      toast({ title: "הועתק ✓", description: email });
+    } catch (err) {
+      console.error("Copy failed:", err);
+      toast({ title: "שגיאה", description: "לא ניתן להעתיק", variant: "destructive" });
+    }
   };
 
   const clearUserFilter = () => {
@@ -1411,6 +1434,15 @@ export const FileRequestsManager = () => {
                             >
                               {request.email}
                             </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleCopyEmail(e, request.email)}
+                              title="העתק מייל"
+                              aria-label="העתק מייל"
+                              className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-primary transition-colors flex-shrink-0"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                           <button
                             onClick={() => handleFilterByUser(request, 'id_number')}
@@ -1645,12 +1677,23 @@ export const FileRequestsManager = () => {
 
                     {/* Content */}
                     <div className="space-y-2">
-                      <button
-                        onClick={() => handleFilterByUser(request, 'email')}
-                        className="text-sm font-medium hover:underline hover:text-primary transition-colors block truncate w-full text-right"
-                      >
-                        {request.email}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleFilterByUser(request, 'email')}
+                          className="text-sm font-medium hover:underline hover:text-primary transition-colors truncate text-right flex-1 min-w-0"
+                        >
+                          {request.email}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleCopyEmail(e, request.email)}
+                          title="העתק מייל"
+                          aria-label="העתק מייל"
+                          className="p-2 rounded hover:bg-accent text-muted-foreground hover:text-primary transition-colors flex-shrink-0"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">ת.ז: {request.id_number}</span>
                         <Badge variant="outline" className="text-xs">{request.course_name}</Badge>
