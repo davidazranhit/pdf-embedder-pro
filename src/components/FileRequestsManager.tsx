@@ -1434,6 +1434,15 @@ export const FileRequestsManager = () => {
                             >
                               {request.email}
                             </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleCopyEmail(e, request.email)}
+                              title="העתק מייל"
+                              aria-label="העתק מייל"
+                              className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-primary transition-colors flex-shrink-0"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                           <button
                             onClick={() => handleFilterByUser(request, 'id_number')}
@@ -1668,12 +1677,23 @@ export const FileRequestsManager = () => {
 
                     {/* Content */}
                     <div className="space-y-2">
-                      <button
-                        onClick={() => handleFilterByUser(request, 'email')}
-                        className="text-sm font-medium hover:underline hover:text-primary transition-colors block truncate w-full text-right"
-                      >
-                        {request.email}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleFilterByUser(request, 'email')}
+                          className="text-sm font-medium hover:underline hover:text-primary transition-colors truncate text-right flex-1 min-w-0"
+                        >
+                          {request.email}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleCopyEmail(e, request.email)}
+                          title="העתק מייל"
+                          aria-label="העתק מייל"
+                          className="p-2 rounded hover:bg-accent text-muted-foreground hover:text-primary transition-colors flex-shrink-0"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">ת.ז: {request.id_number}</span>
                         <Badge variant="outline" className="text-xs">{request.course_name}</Badge>
