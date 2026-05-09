@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Send, Filter, Calendar as CalendarIcon, X, Users, Check, Mail, User, BookOpen, Clock, MessageSquare, ChevronDown, ShieldCheck, Eye, AlertTriangle, Ban, RotateCcw, Loader2 } from "lucide-react";
+import { FileText, Send, Filter, Calendar as CalendarIcon, X, Users, Check, Mail, User, BookOpen, Clock, MessageSquare, ChevronDown, ShieldCheck, Eye, AlertTriangle, Ban, RotateCcw, Loader2, Copy } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -228,6 +228,29 @@ export const FileRequestsManager = () => {
 
   const handleFilterByUser = (request: FileRequest, type: 'email' | 'id_number') => {
     setUserFilter({ type, value: type === 'email' ? request.email : request.id_number });
+  };
+
+  const handleCopyEmail = async (e: React.MouseEvent, email: string) => {
+    e.stopPropagation();
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(email);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = email;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      toast({ title: "הועתק ✓", description: email });
+    } catch (err) {
+      console.error("Copy failed:", err);
+      toast({ title: "שגיאה", description: "לא ניתן להעתיק", variant: "destructive" });
+    }
   };
 
   const clearUserFilter = () => {
