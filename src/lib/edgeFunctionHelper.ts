@@ -22,36 +22,45 @@ export async function invokeWithRetry<T = any>({
   for (let attempt = 0; attempt <= retries; attempt++) {
     if (attempt > 0) {
       console.log(`Retry ${attempt}/${retries} for ${functionName}`);
-      // Small delay before retry
-      await new Promise((r) => setTimeout(r, 2000));
+      await new Promise((r) => setTimeout(r, 1500));
     }
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) => {
+      timer = setTimeout(
+        () =>
+          resolve({
+            data: null,
+            error: new Error("הבקשה חרגה מזמן התגובה המותר"),
+          }),
+        timeoutMs
+      );
+    });
 
     try {
-      const { data, error } = await supabase.functions.invoke(functionName, {
-        body,
-        // @ts-ignore – supabase-js v2 supports signal on some builds
-      });
+      const invokePromise = supabase.functions
+        .invoke(functionName, { body })
+        .then(({ data, error }) => ({
+          data: (data ?? null) as T | null,
+          error: error
+            ? new Error(typeof error === "string" ? error : (error as any).message || "Edge function error")
+            : null,
+        }))
+        .catch((err: any) => ({
+          data: null as T | null,
+          error: err instanceof Error ? err : new Error(String(err)),
+        }));
 
-      clearTimeout(timer);
+      const result = await Promise.race([invokePromise, timeoutPromise]);
+      if (timer) clearTimeout(timer);
 
-      if (error) {
-        lastError = new Error(typeof error === "string" ? error : error.message || "Edge function error");
-        // If it's a server error (not a client abort), retry
+      if (result.error) {
+        lastError = result.error;
         continue;
       }
-
-      return { data: data as T, error: null };
+      return { data: result.data as T, error: null };
     } catch (err: any) {
-      clearTimeout(timer);
-
-      if (err.name === "AbortError" || controller.signal.aborted) {
-        lastError = new Error("הבקשה חרגה מזמן התגובה המותר. נסה שוב.");
-        continue;
-      }
-
+      if (timer) clearTimeout(timer);
       lastError = err instanceof Error ? err : new Error(String(err));
       continue;
     }
