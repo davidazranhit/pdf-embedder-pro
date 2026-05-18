@@ -5,63 +5,97 @@ interface InvokeOptions {
   body: Record<string, unknown>;
   timeoutMs?: number;
   retries?: number;
+  onAttempt?: (attempt: number, retries: number) => void;
 }
 
 /**
- * Invoke a Supabase edge function with timeout and retry logic.
- * Prevents the UI from hanging indefinitely on slow/mobile connections.
+ * Invoke a Supabase edge function via raw fetch with a *real* AbortController
+ * timeout and retry logic.
+ *
+ * Why not `supabase.functions.invoke`?
+ * That helper does not expose its underlying AbortSignal, so when a mobile
+ * network drops (e.g. Wi-Fi → 4G handover) the fetch stays pending on a dead
+ * socket forever and the UI hangs at "process watermark". Using fetch directly
+ * lets us abort the dead request and actually retry on a fresh connection.
  */
 export async function invokeWithRetry<T = any>({
   functionName,
   body,
-  timeoutMs = 120_000, // 2 minutes default
-  retries = 1,
+  timeoutMs = 90_000, // 90s per attempt
+  retries = 2,
+  onAttempt,
 }: InvokeOptions): Promise<{ data: T; error: null } | { data: null; error: Error }> {
   let lastError: Error | null = null;
+
+  const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL as string;
+  const anonKey = (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+  const url = `${supabaseUrl}/functions/v1/${functionName}`;
+
+  // Try to attach the user JWT so RLS / verify_jwt functions work.
+  let authHeader = `Bearer ${anonKey}`;
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (token) authHeader = `Bearer ${token}`;
+  } catch {
+    // ignore — fall back to anon key
+  }
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     if (attempt > 0) {
       console.log(`Retry ${attempt}/${retries} for ${functionName}`);
-      await new Promise((r) => setTimeout(r, 1500));
+      // Brief backoff so the network has a chance to recover
+      await new Promise((r) => setTimeout(r, 1200));
     }
+    onAttempt?.(attempt, retries);
 
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) => {
-      timer = setTimeout(
-        () =>
-          resolve({
-            data: null,
-            error: new Error("הבקשה חרגה מזמן התגובה המותר"),
-          }),
-        timeoutMs
-      );
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const invokePromise = supabase.functions
-        .invoke(functionName, { body })
-        .then(({ data, error }) => ({
-          data: (data ?? null) as T | null,
-          error: error
-            ? new Error(typeof error === "string" ? error : (error as any).message || "Edge function error")
-            : null,
-        }))
-        .catch((err: any) => ({
-          data: null as T | null,
-          error: err instanceof Error ? err : new Error(String(err)),
-        }));
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: anonKey,
+          Authorization: authHeader,
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+        // Don't let the browser reuse a stale keepalive connection on retry
+        cache: "no-store",
+      });
+      clearTimeout(timer);
 
-      const result = await Promise.race([invokePromise, timeoutPromise]);
-      if (timer) clearTimeout(timer);
+      const text = await res.text();
+      let parsed: any = null;
+      try {
+        parsed = text ? JSON.parse(text) : null;
+      } catch {
+        parsed = text;
+      }
 
-      if (result.error) {
-        lastError = result.error;
+      if (!res.ok) {
+        const msg =
+          (parsed && typeof parsed === "object" && (parsed.error || parsed.message)) ||
+          `Edge function ${functionName} returned ${res.status}`;
+        lastError = new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+        // 4xx (except 408/429) are not transient — don't retry
+        if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
+          return { data: null, error: lastError };
+        }
         continue;
       }
-      return { data: result.data as T, error: null };
+
+      return { data: parsed as T, error: null };
     } catch (err: any) {
-      if (timer) clearTimeout(timer);
-      lastError = err instanceof Error ? err : new Error(String(err));
+      clearTimeout(timer);
+      const aborted = err?.name === "AbortError";
+      lastError = aborted
+        ? new Error("הבקשה חרגה מזמן התגובה — מנסה שוב...")
+        : err instanceof Error
+        ? err
+        : new Error(String(err));
       continue;
     }
   }
