@@ -6,6 +6,8 @@ interface InvokeOptions {
   timeoutMs?: number;
   retries?: number;
   onAttempt?: (attempt: number, retries: number) => void;
+  /** External AbortSignal — when aborted, the in-flight fetch is cancelled and no more retries run. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -21,9 +23,10 @@ interface InvokeOptions {
 export async function invokeWithRetry<T = any>({
   functionName,
   body,
-  timeoutMs = 90_000, // 90s per attempt
-  retries = 2,
+  timeoutMs = 45_000, // 45s per attempt — fail fast
+  retries = 1,
   onAttempt,
+  signal,
 }: InvokeOptions): Promise<{ data: T; error: null } | { data: null; error: Error }> {
   let lastError: Error | null = null;
 
@@ -42,15 +45,19 @@ export async function invokeWithRetry<T = any>({
   }
 
   for (let attempt = 0; attempt <= retries; attempt++) {
+    if (signal?.aborted) {
+      return { data: null, error: new Error("בוטל על ידי המשתמש") };
+    }
     if (attempt > 0) {
       console.log(`Retry ${attempt}/${retries} for ${functionName}`);
-      // Brief backoff so the network has a chance to recover
-      await new Promise((r) => setTimeout(r, 1200));
+      await new Promise((r) => setTimeout(r, 800));
     }
     onAttempt?.(attempt, retries);
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const onExternalAbort = () => controller.abort();
+    signal?.addEventListener("abort", onExternalAbort);
 
     try {
       const res = await fetch(url, {
@@ -62,10 +69,10 @@ export async function invokeWithRetry<T = any>({
         },
         body: JSON.stringify(body),
         signal: controller.signal,
-        // Don't let the browser reuse a stale keepalive connection on retry
         cache: "no-store",
       });
       clearTimeout(timer);
+      signal?.removeEventListener("abort", onExternalAbort);
 
       const text = await res.text();
       let parsed: any = null;
@@ -90,6 +97,10 @@ export async function invokeWithRetry<T = any>({
       return { data: parsed as T, error: null };
     } catch (err: any) {
       clearTimeout(timer);
+      signal?.removeEventListener("abort", onExternalAbort);
+      if (signal?.aborted) {
+        return { data: null, error: new Error("בוטל על ידי המשתמש") };
+      }
       const aborted = err?.name === "AbortError";
       lastError = aborted
         ? new Error("הבקשה חרגה מזמן התגובה — מנסה שוב...")
