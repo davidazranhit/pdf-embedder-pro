@@ -625,8 +625,18 @@ export const FileRequestsManager = () => {
           email: sendingRequest.email,
           userId: sendingRequest.id_number,
         },
-        timeoutMs: 150_000, // 2.5 minutes for watermark processing
-        retries: 1,
+        timeoutMs: 90_000, // 90s per attempt — fail fast on stuck mobile sockets
+        retries: 2,
+        onAttempt: (attempt) => {
+          if (attempt === 0) {
+            setSendProgress({ step: "מעבד סימני מים...", percent: 15 });
+          } else {
+            setSendProgress({
+              step: `מעבד סימני מים... (ניסיון ${attempt + 1})`,
+              percent: 20,
+            });
+          }
+        },
       });
 
       if (processError || !processData?.files || processData.files.length === 0) {
