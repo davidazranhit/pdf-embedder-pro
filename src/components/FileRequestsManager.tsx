@@ -124,6 +124,7 @@ export const FileRequestsManager = () => {
   const [sendingRequest, setSendingRequest] = useState<FileRequest | null>(null);
   const [isSendingFiles, setIsSendingFiles] = useState(false);
   const [sendProgress, setSendProgress] = useState<{ step: string; percent: number }>({ step: "", percent: 0 });
+  const [sendAbortController, setSendAbortController] = useState<AbortController | null>(null);
   
   // Bulk selection state
   const [selectedRequestIds, setSelectedRequestIds] = useState<Set<string>>(new Set());
@@ -601,6 +602,8 @@ export const FileRequestsManager = () => {
   const handleSendSelectedFiles = async () => {
     if (!sendingRequest || selectedFileIds.size === 0) return;
 
+    const abortController = new AbortController();
+    setSendAbortController(abortController);
     setIsSendingFiles(true);
     try {
       // Get selected templates
@@ -625,8 +628,9 @@ export const FileRequestsManager = () => {
           email: sendingRequest.email,
           userId: sendingRequest.id_number,
         },
-        timeoutMs: 90_000, // 90s per attempt — fail fast on stuck mobile sockets
-        retries: 2,
+        timeoutMs: 45_000, // 45s per attempt — fail fast
+        retries: 1,
+        signal: abortController.signal,
         onAttempt: (attempt) => {
           if (attempt === 0) {
             setSendProgress({ step: "מעבד סימני מים...", percent: 15 });
@@ -638,6 +642,8 @@ export const FileRequestsManager = () => {
           }
         },
       });
+
+      if (abortController.signal.aborted) return;
 
       if (processError || !processData?.files || processData.files.length === 0) {
         console.error("Error processing watermarks:", processError);
@@ -668,9 +674,12 @@ export const FileRequestsManager = () => {
           courseName: sendingRequest.course_name,
           idNumber: sendingRequest.id_number,
         },
-        timeoutMs: 60_000,
+        timeoutMs: 30_000,
         retries: 1,
+        signal: abortController.signal,
       });
+
+      if (abortController.signal.aborted) return;
 
       if (sendError) {
         console.error("Error sending email:", sendError);
@@ -707,6 +716,7 @@ export const FileRequestsManager = () => {
       fetchRequests();
     } catch (error) {
       console.error("Error in handleSendSelectedFiles:", error);
+      if (abortController.signal.aborted) return;
       toast({
         title: "שגיאה",
         description: "שגיאה כללית בתהליך השליחה",
@@ -715,7 +725,16 @@ export const FileRequestsManager = () => {
     } finally {
       setIsSendingFiles(false);
       setSendProgress({ step: "", percent: 0 });
+      setSendAbortController(null);
     }
+  };
+
+  const handleCancelSend = () => {
+    sendAbortController?.abort();
+    setIsSendingFiles(false);
+    setSendProgress({ step: "", percent: 0 });
+    setSendAbortController(null);
+    toast({ title: "השליחה בוטלה", description: "התהליך נעצר" });
   };
 
   const handleQuickFilter = (value: string) => {
@@ -1145,14 +1164,17 @@ export const FileRequestsManager = () => {
               <Button
                 variant="outline"
                 onClick={() => {
+                  if (isSendingFiles) {
+                    handleCancelSend();
+                    return;
+                  }
                   setShowFileSendDialog(false);
                   setSendingRequest(null);
                   setSelectedFilesDialogCategory("");
                   setSelectedFileIds(new Set());
                 }}
-                disabled={isSendingFiles}
               >
-                ביטול
+                {isSendingFiles ? "עצור שליחה" : "ביטול"}
               </Button>
               <Button
                 onClick={handleSendSelectedFiles}
