@@ -53,31 +53,28 @@ async function loadHebrewFontBytes(): Promise<{ regular: Uint8Array; bold: Uint8
     }
   ];
 
-  for (const source of fontSources) {
-    try {
-      console.log("Trying to load Hebrew fonts from:", source.regular);
-      const [regularRes, boldRes] = await Promise.all([
-        fetch(source.regular, { headers: { 'Accept': '*/*' } }),
-        fetch(source.bold, { headers: { 'Accept': '*/*' } })
-      ]);
+  // Race all sources in parallel — first one to return a valid pair wins.
+  const attempts = fontSources.map(async (source) => {
+    const [regularRes, boldRes] = await Promise.all([
+      fetch(source.regular, { headers: { 'Accept': '*/*' } }),
+      fetch(source.bold, { headers: { 'Accept': '*/*' } })
+    ]);
+    if (!regularRes.ok || !boldRes.ok) throw new Error(`HTTP ${regularRes.status}/${boldRes.status}`);
+    const regularBytes = new Uint8Array(await regularRes.arrayBuffer());
+    const boldBytes = new Uint8Array(await boldRes.arrayBuffer());
+    if (regularBytes.length < 5000 || boldBytes.length < 5000) throw new Error("Font too small");
+    return { regular: regularBytes, bold: boldBytes };
+  });
 
-      if (regularRes.ok && boldRes.ok) {
-        const regularBytes = new Uint8Array(await regularRes.arrayBuffer());
-        const boldBytes = new Uint8Array(await boldRes.arrayBuffer());
-
-        if (regularBytes.length > 5000 && boldBytes.length > 5000) {
-          cachedFontBytes = { regular: regularBytes, bold: boldBytes };
-          console.log("Hebrew font bytes cached successfully");
-          return cachedFontBytes;
-        }
-      }
-    } catch (fontError) {
-      console.error("Error loading fonts from source:", fontError);
-    }
+  try {
+    const winner = await Promise.any(attempts);
+    cachedFontBytes = winner;
+    console.log("Hebrew font bytes cached (parallel race)");
+    return cachedFontBytes;
+  } catch {
+    console.warn("All Hebrew font sources failed");
+    return null;
   }
-
-  console.warn("All Hebrew font sources failed");
-  return null;
 }
 
 // ── Text helpers ──
@@ -437,16 +434,25 @@ serve(async (req) => {
     let filesOut: { originalId?: string; processedId: string; originalName?: string }[] = [];
 
     if (filePaths.length > 0) {
-      // Process files sequentially to avoid memory/timeout issues with large batches
-      for (const fp of filePaths) {
-        try {
-          const displayName = templateNameMap.get(fp);
-          const processedId = await processOne(fp, displayName);
-          filesOut.push({ originalId: fp, processedId, originalName: displayName });
-        } catch (err) {
-          console.error('Error processing file:', fp, err);
+      // Process files in parallel with a concurrency cap to balance speed vs memory.
+      // Cap chosen to stay well under the edge runtime memory limit even for ~10MB PDFs.
+      const CONCURRENCY = 4;
+      let cursor = 0;
+      const workers = Array.from({ length: Math.min(CONCURRENCY, filePaths.length) }, async () => {
+        while (true) {
+          const i = cursor++;
+          if (i >= filePaths.length) return;
+          const fp = filePaths[i];
+          try {
+            const displayName = templateNameMap.get(fp);
+            const processedId = await processOne(fp, displayName);
+            filesOut.push({ originalId: fp, processedId, originalName: displayName });
+          } catch (err) {
+            console.error('Error processing file:', fp, err);
+          }
         }
-      }
+      });
+      await Promise.all(workers);
     } else if (singleFilePath) {
       const displayName = singleFileName || templateNameMap.get(singleFilePath);
       const processedId = await processOne(singleFilePath, displayName);
