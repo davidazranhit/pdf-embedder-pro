@@ -694,13 +694,25 @@ export const FileRequestsManager = () => {
       // Step 3: Updating status
       setSendProgress({ step: "מעדכן סטטוס...", percent: 90 });
 
-      await supabase
+      setRequests((prev) =>
+        prev.map((r) =>
+          r.id === sendingRequest.id
+            ? { ...r, status: "sent", sent_date: new Date().toISOString() }
+            : r
+        )
+      );
+
+      const { error: updateError } = await supabase
         .from("file_requests")
         .update({
           status: "sent",
           sent_date: new Date().toISOString(),
         })
         .eq("id", sendingRequest.id);
+
+      if (updateError) {
+        console.error("Error updating request status after send:", updateError);
+      }
 
       setSendProgress({ step: "הושלם! ✓", percent: 100 });
 
@@ -937,13 +949,25 @@ export const FileRequestsManager = () => {
         // Step 3: Update status
         setBulkSendProgress({ current: i, total: requestsToSend.length, currentEmail: request.email, step: "מעדכן סטטוס..." });
 
-        await supabase
+        setRequests((prev) =>
+          prev.map((r) =>
+            r.id === request.id
+              ? { ...r, status: "sent", sent_date: new Date().toISOString() }
+              : r
+          )
+        );
+
+        const { error: updateError } = await supabase
           .from("file_requests")
           .update({
             status: "sent",
             sent_date: new Date().toISOString(),
           })
           .eq("id", request.id);
+
+        if (updateError) {
+          console.error("Error updating bulk request status after send:", updateError);
+        }
 
         successCount++;
         setBulkSendProgress({ current: i + 1, total: requestsToSend.length, currentEmail: request.email, step: "הושלם ✓" });
@@ -997,8 +1021,27 @@ export const FileRequestsManager = () => {
       />
 
       {/* File Selection Dialog */}
-      <Dialog open={showFileSendDialog} onOpenChange={setShowFileSendDialog}>
-        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
+      <Dialog
+        open={showFileSendDialog}
+        onOpenChange={(open) => {
+          if (isSendingFiles) return;
+          setShowFileSendDialog(open);
+          if (!open) {
+            setSendingRequest(null);
+            setSelectedFilesDialogCategory("");
+            setSelectedFileIds(new Set());
+          }
+        }}
+      >
+        <DialogContent
+          className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto"
+          onInteractOutside={(event) => {
+            if (isSendingFiles) event.preventDefault();
+          }}
+          onEscapeKeyDown={(event) => {
+            if (isSendingFiles) event.preventDefault();
+          }}
+        >
           <DialogHeader>
             <DialogTitle className="text-xl">שלח קבצים נבחרים</DialogTitle>
             <DialogDescription>
