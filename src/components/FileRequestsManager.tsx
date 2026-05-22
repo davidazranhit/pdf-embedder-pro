@@ -898,7 +898,7 @@ export const FileRequestsManager = () => {
             email: request.email,
             userId: request.id_number,
           },
-          timeoutMs: 150_000,
+          timeoutMs: 45_000,
           retries: 1,
         });
 
@@ -924,7 +924,7 @@ export const FileRequestsManager = () => {
             courseName: request.course_name,
             idNumber: request.id_number,
           },
-          timeoutMs: 60_000,
+          timeoutMs: 30_000,
           retries: 1,
         });
 

@@ -55,10 +55,13 @@ async function loadHebrewFontBytes(): Promise<{ regular: Uint8Array; bold: Uint8
 
   // Race all sources in parallel — first one to return a valid pair wins.
   const attempts = fontSources.map(async (source) => {
+    // Per-source timeout: a hanging CDN must not block the race forever
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 6000);
     const [regularRes, boldRes] = await Promise.all([
-      fetch(source.regular, { headers: { 'Accept': '*/*' } }),
-      fetch(source.bold, { headers: { 'Accept': '*/*' } })
-    ]);
+      fetch(source.regular, { headers: { 'Accept': '*/*' }, signal: ctrl.signal }),
+      fetch(source.bold, { headers: { 'Accept': '*/*' }, signal: ctrl.signal })
+    ]).finally(() => clearTimeout(t));
     if (!regularRes.ok || !boldRes.ok) throw new Error(`HTTP ${regularRes.status}/${boldRes.status}`);
     const regularBytes = new Uint8Array(await regularRes.arrayBuffer());
     const boldBytes = new Uint8Array(await boldRes.arrayBuffer());
