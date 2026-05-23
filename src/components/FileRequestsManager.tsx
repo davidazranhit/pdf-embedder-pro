@@ -606,15 +606,16 @@ export const FileRequestsManager = () => {
    *
    * Returns a discriminated result instead of throwing — callers handle UI.
    */
+  type SendResult =
+    | { ok: true; processedCount: number; error?: undefined }
+    | { ok: false; processedCount?: undefined; error: string };
+
   const sendFilesForRequest = async (params: {
     request: FileRequest;
     fileIds: string[];
     signal?: AbortSignal;
     onProgress?: (step: string, percent: number) => void;
-  }): Promise<
-    | { ok: true; processedCount: number }
-    | { ok: false; error: string }
-  > => {
+  }): Promise<SendResult> => {
     const { request, fileIds, signal, onProgress } = params;
 
     onProgress?.("מעבד סימני מים...", 15);
