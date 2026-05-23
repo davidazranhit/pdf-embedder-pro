@@ -602,8 +602,6 @@ export const FileRequestsManager = () => {
   const handleSendSelectedFiles = async () => {
     if (!sendingRequest || selectedFileIds.size === 0) return;
 
-    // (defined just above; keeps code colocated)
-
     const abortController = new AbortController();
     setSendAbortController(abortController);
     setIsSendingFiles(true);
