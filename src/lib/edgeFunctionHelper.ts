@@ -8,6 +8,33 @@ interface InvokeOptions {
   onAttempt?: (attempt: number, retries: number) => void;
   /** External AbortSignal — when aborted, the in-flight fetch is cancelled and no more retries run. */
   signal?: AbortSignal;
+  /** Skip session lookup and invoke immediately with the publishable key. Useful for public functions. */
+  skipSession?: boolean;
+}
+
+async function resolveAuthHeader(anonKey: string, skipSession?: boolean): Promise<string> {
+  const fallback = `Bearer ${anonKey}`;
+
+  if (skipSession) {
+    return fallback;
+  }
+
+  try {
+    return await Promise.race([
+      supabase.auth
+        .getSession()
+        .then(({ data }) => {
+          const token = data?.session?.access_token;
+          return token ? `Bearer ${token}` : fallback;
+        })
+        .catch(() => fallback),
+      new Promise<string>((resolve) => {
+        setTimeout(() => resolve(fallback), 350);
+      }),
+    ]);
+  } catch {
+    return fallback;
+  }
 }
 
 /**
@@ -27,6 +54,7 @@ export async function invokeWithRetry<T = any>({
   retries = 1,
   onAttempt,
   signal,
+  skipSession,
 }: InvokeOptions): Promise<{ data: T; error: null } | { data: null; error: Error }> {
   let lastError: Error | null = null;
 
@@ -34,15 +62,8 @@ export async function invokeWithRetry<T = any>({
   const anonKey = (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY as string;
   const url = `${supabaseUrl}/functions/v1/${functionName}`;
 
-  // Try to attach the user JWT so RLS / verify_jwt functions work.
-  let authHeader = `Bearer ${anonKey}`;
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData?.session?.access_token;
-    if (token) authHeader = `Bearer ${token}`;
-  } catch {
-    // ignore — fall back to anon key
-  }
+  // For public functions, never let auth/session resolution block the actual request.
+  const authHeader = await resolveAuthHeader(anonKey, skipSession);
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     if (signal?.aborted) {
