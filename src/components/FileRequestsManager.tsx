@@ -631,6 +631,7 @@ export const FileRequestsManager = () => {
         timeoutMs: 45_000, // 45s per attempt — fail fast
         retries: 1,
         signal: abortController.signal,
+        skipSession: true,
         onAttempt: (attempt) => {
           if (attempt === 0) {
             setSendProgress({ step: "מעבד סימני מים...", percent: 15 });
@@ -677,6 +678,7 @@ export const FileRequestsManager = () => {
         timeoutMs: 30_000,
         retries: 1,
         signal: abortController.signal,
+        skipSession: true,
       });
 
       if (abortController.signal.aborted) return;
@@ -912,6 +914,7 @@ export const FileRequestsManager = () => {
           },
           timeoutMs: 45_000,
           retries: 1,
+          skipSession: true,
         });
 
         if (processError || !processData?.files || processData.files.length === 0) {
@@ -938,6 +941,7 @@ export const FileRequestsManager = () => {
           },
           timeoutMs: 30_000,
           retries: 1,
+          skipSession: true,
         });
 
         if (sendError) {
