@@ -599,6 +599,91 @@ export const FileRequestsManager = () => {
     setShowFileSendDialog(true);
   };
 
+  /**
+   * Single source of truth for sending watermarked files for one request.
+   * Used by both single-send and bulk-send flows so behavior is identical
+   * across desktop, mobile, single, and bulk.
+   *
+   * Returns a discriminated result instead of throwing — callers handle UI.
+   */
+  type SendResult =
+    | { ok: true; processedCount: number; error?: undefined }
+    | { ok: false; processedCount?: undefined; error: string };
+
+  const sendFilesForRequest = async (params: {
+    request: FileRequest;
+    fileIds: string[];
+    signal?: AbortSignal;
+    onProgress?: (step: string, percent: number) => void;
+  }): Promise<SendResult> => {
+    const { request, fileIds, signal, onProgress } = params;
+
+    onProgress?.("מעבד סימני מים...", 15);
+
+    const { data: processData, error: processError } = await invokeWithRetry({
+      functionName: "process-watermark",
+      body: {
+        fileIds,
+        email: request.email,
+        userId: request.id_number,
+      },
+      timeoutMs: 45_000,
+      retries: 1,
+      signal,
+      skipSession: true,
+      onAttempt: (attempt) => {
+        onProgress?.(
+          attempt === 0
+            ? "מעבד סימני מים..."
+            : `מעבד סימני מים... (ניסיון ${attempt + 1})`,
+          attempt === 0 ? 15 : 20,
+        );
+      },
+    });
+
+    if (signal?.aborted) return { ok: false, error: "בוטל" };
+
+    if (processError || !processData?.files || processData.files.length === 0) {
+      console.error("process-watermark failed", { email: request.email, processError });
+      return {
+        ok: false,
+        error: processError?.message || "לא הצלחנו לעבד את הקבצים. נסה שוב.",
+      };
+    }
+
+    onProgress?.("קבצים עובדו בהצלחה!", 60);
+
+    const processedFiles = processData.files.map((f: any) => ({
+      processedId: f.processedId,
+      originalName: f.originalName,
+    }));
+
+    onProgress?.("שולח מייל...", 75);
+
+    const { error: sendError } = await invokeWithRetry({
+      functionName: "send-watermarked-files",
+      body: {
+        email: request.email,
+        fileIds: processedFiles,
+        courseName: request.course_name,
+        idNumber: request.id_number,
+      },
+      timeoutMs: 30_000,
+      retries: 1,
+      signal,
+      skipSession: true,
+    });
+
+    if (signal?.aborted) return { ok: false, error: "בוטל" };
+
+    if (sendError) {
+      console.error("send-watermarked-files failed", { email: request.email, sendError });
+      return { ok: false, error: sendError.message || "שגיאה בשליחת המייל" };
+    }
+
+    return { ok: true, processedCount: processedFiles.length };
+  };
+
   const handleSendSelectedFiles = async () => {
     if (!sendingRequest || selectedFileIds.size === 0) return;
 
@@ -619,75 +704,19 @@ export const FileRequestsManager = () => {
       // Collect all file paths
       const allFileIds = selectedTemplatesList.map((template) => template.file_path);
 
-      setSendProgress({ step: "מעבד סימני מים...", percent: 15 });
-
-      const { data: processData, error: processError } = await invokeWithRetry({
-        functionName: "process-watermark",
-        body: {
-          fileIds: allFileIds,
-          email: sendingRequest.email,
-          userId: sendingRequest.id_number,
-        },
-        timeoutMs: 45_000, // 45s per attempt — fail fast
-        retries: 1,
+      const result = await sendFilesForRequest({
+        request: sendingRequest,
+        fileIds: allFileIds,
         signal: abortController.signal,
-        skipSession: true,
-        onAttempt: (attempt) => {
-          if (attempt === 0) {
-            setSendProgress({ step: "מעבד סימני מים...", percent: 15 });
-          } else {
-            setSendProgress({
-              step: `מעבד סימני מים... (ניסיון ${attempt + 1})`,
-              percent: 20,
-            });
-          }
-        },
+        onProgress: (step, percent) => setSendProgress({ step, percent }),
       });
 
       if (abortController.signal.aborted) return;
 
-      if (processError || !processData?.files || processData.files.length === 0) {
-        console.error("Error processing watermarks:", processError);
+      if (!result.ok) {
         toast({
           title: "שגיאה",
-          description: processError?.message || "לא הצלחנו לעבד את הקבצים. נסה שוב.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setSendProgress({ step: "קבצים עובדו בהצלחה!", percent: 60 });
-
-      // Extract processed file info
-      const processedFiles = processData.files.map((f: any) => ({
-        processedId: f.processedId,
-        originalName: f.originalName
-      }));
-
-      // Step 2: Sending email
-      setSendProgress({ step: "שולח מייל...", percent: 75 });
-
-      const { error: sendError } = await invokeWithRetry({
-        functionName: "send-watermarked-files",
-        body: {
-          email: sendingRequest.email,
-          fileIds: processedFiles,
-          courseName: sendingRequest.course_name,
-          idNumber: sendingRequest.id_number,
-        },
-        timeoutMs: 30_000,
-        retries: 1,
-        signal: abortController.signal,
-        skipSession: true,
-      });
-
-      if (abortController.signal.aborted) return;
-
-      if (sendError) {
-        console.error("Error sending email:", sendError);
-        toast({
-          title: "שגיאה",
-          description: sendError.message || "שגיאה בשליחת המייל",
+          description: result.error,
           variant: "destructive",
         });
         return;
@@ -720,7 +749,7 @@ export const FileRequestsManager = () => {
 
       toast({
         title: "הצלחה",
-        description: `${processedFiles.length} קבצים נשלחו בהצלחה`,
+        description: `${result.processedCount} קבצים נשלחו בהצלחה`,
       });
 
       setShowFileSendDialog(false);
@@ -902,50 +931,19 @@ export const FileRequestsManager = () => {
       const request = requestsToSend[i];
 
       try {
-        // Step 1: Watermark
-        setBulkSendProgress({ current: i, total: requestsToSend.length, currentEmail: request.email, step: "מעבד סימני מים..." });
-
-        const { data: processData, error: processError } = await invokeWithRetry({
-          functionName: "process-watermark",
-          body: {
-            fileIds: allFileIds,
-            email: request.email,
-            userId: request.id_number,
-          },
-          timeoutMs: 45_000,
-          retries: 1,
-          skipSession: true,
+        const result = await sendFilesForRequest({
+          request,
+          fileIds: allFileIds,
+          onProgress: (step) =>
+            setBulkSendProgress({
+              current: i,
+              total: requestsToSend.length,
+              currentEmail: request.email,
+              step,
+            }),
         });
 
-        if (processError || !processData?.files || processData.files.length === 0) {
-          console.error("Error processing watermarks for", request.email, processError);
-          errorCount++;
-          continue;
-        }
-
-        const processedFiles = processData.files.map((f: any) => ({
-          processedId: f.processedId,
-          originalName: f.originalName,
-        }));
-
-        // Step 2: Send email
-        setBulkSendProgress({ current: i, total: requestsToSend.length, currentEmail: request.email, step: "שולח מייל..." });
-
-        const { error: sendError } = await invokeWithRetry({
-          functionName: "send-watermarked-files",
-          body: {
-            email: request.email,
-            fileIds: processedFiles,
-            courseName: request.course_name,
-            idNumber: request.id_number,
-          },
-          timeoutMs: 30_000,
-          retries: 1,
-          skipSession: true,
-        });
-
-        if (sendError) {
-          console.error("Error sending email to", request.email, sendError);
+        if (!result.ok) {
           errorCount++;
           continue;
         }
