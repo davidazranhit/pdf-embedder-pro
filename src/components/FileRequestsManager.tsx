@@ -599,6 +599,90 @@ export const FileRequestsManager = () => {
     setShowFileSendDialog(true);
   };
 
+  /**
+   * Single source of truth for sending watermarked files for one request.
+   * Used by both single-send and bulk-send flows so behavior is identical
+   * across desktop, mobile, single, and bulk.
+   *
+   * Returns a discriminated result instead of throwing — callers handle UI.
+   */
+  const sendFilesForRequest = async (params: {
+    request: FileRequest;
+    fileIds: string[];
+    signal?: AbortSignal;
+    onProgress?: (step: string, percent: number) => void;
+  }): Promise<
+    | { ok: true; processedCount: number }
+    | { ok: false; error: string }
+  > => {
+    const { request, fileIds, signal, onProgress } = params;
+
+    onProgress?.("מעבד סימני מים...", 15);
+
+    const { data: processData, error: processError } = await invokeWithRetry({
+      functionName: "process-watermark",
+      body: {
+        fileIds,
+        email: request.email,
+        userId: request.id_number,
+      },
+      timeoutMs: 45_000,
+      retries: 1,
+      signal,
+      skipSession: true,
+      onAttempt: (attempt) => {
+        onProgress?.(
+          attempt === 0
+            ? "מעבד סימני מים..."
+            : `מעבד סימני מים... (ניסיון ${attempt + 1})`,
+          attempt === 0 ? 15 : 20,
+        );
+      },
+    });
+
+    if (signal?.aborted) return { ok: false, error: "בוטל" };
+
+    if (processError || !processData?.files || processData.files.length === 0) {
+      console.error("process-watermark failed", { email: request.email, processError });
+      return {
+        ok: false,
+        error: processError?.message || "לא הצלחנו לעבד את הקבצים. נסה שוב.",
+      };
+    }
+
+    onProgress?.("קבצים עובדו בהצלחה!", 60);
+
+    const processedFiles = processData.files.map((f: any) => ({
+      processedId: f.processedId,
+      originalName: f.originalName,
+    }));
+
+    onProgress?.("שולח מייל...", 75);
+
+    const { error: sendError } = await invokeWithRetry({
+      functionName: "send-watermarked-files",
+      body: {
+        email: request.email,
+        fileIds: processedFiles,
+        courseName: request.course_name,
+        idNumber: request.id_number,
+      },
+      timeoutMs: 30_000,
+      retries: 1,
+      signal,
+      skipSession: true,
+    });
+
+    if (signal?.aborted) return { ok: false, error: "בוטל" };
+
+    if (sendError) {
+      console.error("send-watermarked-files failed", { email: request.email, sendError });
+      return { ok: false, error: sendError.message || "שגיאה בשליחת המייל" };
+    }
+
+    return { ok: true, processedCount: processedFiles.length };
+  };
+
   const handleSendSelectedFiles = async () => {
     if (!sendingRequest || selectedFileIds.size === 0) return;
 
