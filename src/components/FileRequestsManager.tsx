@@ -931,50 +931,19 @@ export const FileRequestsManager = () => {
       const request = requestsToSend[i];
 
       try {
-        // Step 1: Watermark
-        setBulkSendProgress({ current: i, total: requestsToSend.length, currentEmail: request.email, step: "מעבד סימני מים..." });
-
-        const { data: processData, error: processError } = await invokeWithRetry({
-          functionName: "process-watermark",
-          body: {
-            fileIds: allFileIds,
-            email: request.email,
-            userId: request.id_number,
-          },
-          timeoutMs: 45_000,
-          retries: 1,
-          skipSession: true,
+        const result = await sendFilesForRequest({
+          request,
+          fileIds: allFileIds,
+          onProgress: (step) =>
+            setBulkSendProgress({
+              current: i,
+              total: requestsToSend.length,
+              currentEmail: request.email,
+              step,
+            }),
         });
 
-        if (processError || !processData?.files || processData.files.length === 0) {
-          console.error("Error processing watermarks for", request.email, processError);
-          errorCount++;
-          continue;
-        }
-
-        const processedFiles = processData.files.map((f: any) => ({
-          processedId: f.processedId,
-          originalName: f.originalName,
-        }));
-
-        // Step 2: Send email
-        setBulkSendProgress({ current: i, total: requestsToSend.length, currentEmail: request.email, step: "שולח מייל..." });
-
-        const { error: sendError } = await invokeWithRetry({
-          functionName: "send-watermarked-files",
-          body: {
-            email: request.email,
-            fileIds: processedFiles,
-            courseName: request.course_name,
-            idNumber: request.id_number,
-          },
-          timeoutMs: 30_000,
-          retries: 1,
-          skipSession: true,
-        });
-
-        if (sendError) {
-          console.error("Error sending email to", request.email, sendError);
+        if (!result.ok) {
           errorCount++;
           continue;
         }
