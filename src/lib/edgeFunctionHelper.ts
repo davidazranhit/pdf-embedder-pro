@@ -65,6 +65,14 @@ export async function invokeWithRetry<T = any>({
   // For public functions, never let auth/session resolution block the actual request.
   const authHeader = await resolveAuthHeader(anonKey, skipSession);
 
+  // Sanity check — if env is missing the request would silently never go out.
+  if (!supabaseUrl || !anonKey) {
+    return {
+      data: null,
+      error: new Error("תצורת השרת חסרה. רענן את הדף ונסה שוב."),
+    };
+  }
+
   for (let attempt = 0; attempt <= retries; attempt++) {
     if (signal?.aborted) {
       return { data: null, error: new Error("בוטל על ידי המשתמש") };
