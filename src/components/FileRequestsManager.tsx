@@ -1542,7 +1542,13 @@ export const FileRequestsManager = () => {
                             request.status === "handled_not_sent" && "bg-muted text-muted-foreground"
                           )}
                         >
-                          {request.status === "sent" ? "✓ נשלח" : request.status === "handled_not_sent" ? "⊘ טופל - לא נשלח" : "ממתין"}
+                          {request.status === "sent"
+                            ? request.auto_sent
+                              ? "✓ נשלח אוטומטית"
+                              : "✓ נשלח"
+                            : request.status === "handled_not_sent"
+                            ? "⊘ טופל - לא נשלח"
+                            : "ממתין"}
                         </Badge>
                       </TableCell>
                       <TableCell className="py-4">
@@ -1731,7 +1737,13 @@ export const FileRequestsManager = () => {
                             request.status === "handled_not_sent" && "bg-muted text-muted-foreground"
                           )}
                         >
-                          {request.status === "sent" ? "✓ נשלח" : request.status === "handled_not_sent" ? "⊘ טופל - לא נשלח" : "ממתין"}
+                          {request.status === "sent"
+                            ? request.auto_sent
+                              ? "✓ נשלח אוטומטית"
+                              : "✓ נשלח"
+                            : request.status === "handled_not_sent"
+                            ? "⊘ טופל - לא נשלח"
+                            : "ממתין"}
                         </Badge>
                         {isSuspiciousRequest(request) && (
                           <Badge variant="destructive" className="text-xs">
