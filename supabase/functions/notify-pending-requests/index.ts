@@ -69,17 +69,55 @@ serve(async (req) => {
     const pendingCount = count || 0;
     console.log(`Pending requests: ${pendingCount}, threshold: ${threshold}, isScheduledCall: ${isScheduledCall}`);
 
+    // For scheduled (daily) reports, also fetch auto-sent requests from the last 24h.
+    let autoSentRows: Array<{ email: string; course_name: string; sent_date: string | null }> = [];
+    if (isScheduledCall) {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: autoData, error: autoErr } = await supabase
+        .from("file_requests")
+        .select("email, course_name, sent_date")
+        .eq("auto_sent", true)
+        .gte("sent_date", since)
+        .order("sent_date", { ascending: false });
+
+      if (autoErr) {
+        console.error("Error fetching auto-sent rows:", autoErr);
+      } else {
+        autoSentRows = autoData ?? [];
+      }
+    }
+
     // For scheduled calls: send if there are ANY pending requests
     // For threshold calls: send only if pending count >= threshold
-    const shouldSend = isScheduledCall ? pendingCount > 0 : pendingCount >= threshold;
+    const shouldSend = isScheduledCall
+      ? pendingCount > 0 || autoSentRows.length > 0
+      : pendingCount >= threshold;
 
     if (shouldSend) {
       // Send notification email via Brevo
       const systemUrl = "https://pdf-embedder.lovable.app/sys-admin";
       
       const emailSubject = isScheduledCall 
-        ? `📋 דו"ח יומי: ${pendingCount} בקשות ממתינות`
+        ? `📋 דו"ח יומי: ${pendingCount} ממתינות, ${autoSentRows.length} נשלחו אוטומטית`
         : `📋 ממתינות לך ${pendingCount} בקשות במערכת`;
+
+      const autoSentSection = isScheduledCall && autoSentRows.length > 0
+        ? `
+          <div style="background: #ecfdf5; border-radius: 10px; padding: 20px; margin: 20px 0;">
+            <h2 style="color: #065f46; margin: 0 0 12px 0; font-size: 18px;">
+              ✓ נשלחו אוטומטית ב-24 השעות האחרונות (${autoSentRows.length})
+            </h2>
+            <ul style="margin: 0; padding-right: 20px; color: #064e3b;">
+              ${autoSentRows
+                .map(
+                  (r) =>
+                    `<li style="margin: 6px 0;"><strong>${r.email}</strong> — ${r.course_name}</li>`,
+                )
+                .join("")}
+            </ul>
+          </div>
+        `
+        : "";
       
       const emailHtml = `
         <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -92,7 +130,7 @@ serve(async (req) => {
               יש לך <strong style="color: #8B5CF6; font-size: 24px;">${pendingCount}</strong> בקשות ממתינות במערכת
             </p>
           </div>
-          
+          ${autoSentSection}
           <p style="text-align: center; margin: 30px 0;">
             <a href="${systemUrl}" style="background: linear-gradient(135deg, #8B5CF6, #D946EF); color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block;">
               כניסה למערכת
