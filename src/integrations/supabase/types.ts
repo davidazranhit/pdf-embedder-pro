@@ -206,8 +206,36 @@ export type Database = {
         }
         Relationships: []
       }
+      external_api_settings: {
+        Row: {
+          api_key: string | null
+          config: Json
+          created_at: string
+          id: string
+          provider: string
+          updated_at: string
+        }
+        Insert: {
+          api_key?: string | null
+          config?: Json
+          created_at?: string
+          id?: string
+          provider: string
+          updated_at?: string
+        }
+        Update: {
+          api_key?: string | null
+          config?: Json
+          created_at?: string
+          id?: string
+          provider?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       file_requests: {
         Row: {
+          auto_sent: boolean
           course_name: string
           created_at: string
           email: string
@@ -222,6 +250,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          auto_sent?: boolean
           course_name?: string
           created_at?: string
           email: string
@@ -236,6 +265,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          auto_sent?: boolean
           course_name?: string
           created_at?: string
           email?: string
