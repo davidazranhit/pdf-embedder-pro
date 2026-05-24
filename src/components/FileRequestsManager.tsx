@@ -946,9 +946,7 @@ export const FileRequestsManager = () => {
           continue;
         }
 
-        // Step 3: Update status
-        setBulkSendProgress({ current: i, total: requestsToSend.length, currentEmail: request.email, step: "מעדכן סטטוס..." });
-
+        // Optimistic UI update + fire-and-forget DB sync (don't block the loop).
         setRequests((prev) =>
           prev.map((r) =>
             r.id === request.id
@@ -957,17 +955,18 @@ export const FileRequestsManager = () => {
           )
         );
 
-        const { error: updateError } = await supabase
+        void supabase
           .from("file_requests")
           .update({
             status: "sent",
             sent_date: new Date().toISOString(),
           })
-          .eq("id", request.id);
-
-        if (updateError) {
-          console.error("Error updating bulk request status after send:", updateError);
-        }
+          .eq("id", request.id)
+          .then(({ error: updateError }) => {
+            if (updateError) {
+              console.error("Error updating bulk request status after send:", updateError);
+            }
+          });
 
         successCount++;
         setBulkSendProgress({ current: i + 1, total: requestsToSend.length, currentEmail: request.email, step: "הושלם ✓" });
