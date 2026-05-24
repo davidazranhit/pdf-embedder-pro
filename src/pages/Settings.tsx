@@ -980,7 +980,10 @@ const Settings = () => {
             {isAdmin && (
               <>
                 <TabsContent value="api">
-                  <ApiKeysManager />
+                  <div className="space-y-6">
+                    <ApiKeysManager />
+                    <Cs24Settings />
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="webhooks">
