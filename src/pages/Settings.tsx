@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CourseManager } from "@/components/CourseManager";
 import { ApiKeysManager } from "@/components/ApiKeysManager";
+import { Cs24Settings } from "@/components/Cs24Settings";
 import { WebhooksManager } from "@/components/WebhooksManager";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useEditorSettings } from "@/hooks/useEditorSettings";
@@ -980,7 +981,10 @@ const Settings = () => {
             {isAdmin && (
               <>
                 <TabsContent value="api">
-                  <ApiKeysManager />
+                  <div className="space-y-6">
+                    <ApiKeysManager />
+                    <Cs24Settings />
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="webhooks">

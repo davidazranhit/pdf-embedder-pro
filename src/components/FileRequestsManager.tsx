@@ -62,6 +62,7 @@ interface FileRequest {
   submission_date: string;
   status: "pending" | "sent" | "handled_not_sent";
   sent_date: string | null;
+  auto_sent?: boolean;
 }
 
 interface Template {
@@ -722,9 +723,7 @@ export const FileRequestsManager = () => {
         return;
       }
 
-      // Step 3: Updating status
-      setSendProgress({ step: "מעדכן סטטוס...", percent: 90 });
-
+      // Optimistic UI update — files are already sent, close the dialog immediately.
       setRequests((prev) =>
         prev.map((r) =>
           r.id === sendingRequest.id
@@ -733,19 +732,19 @@ export const FileRequestsManager = () => {
         )
       );
 
-      const { error: updateError } = await supabase
+      // Fire-and-forget DB sync — never block the UI on this.
+      void supabase
         .from("file_requests")
         .update({
           status: "sent",
           sent_date: new Date().toISOString(),
         })
-        .eq("id", sendingRequest.id);
-
-      if (updateError) {
-        console.error("Error updating request status after send:", updateError);
-      }
-
-      setSendProgress({ step: "הושלם! ✓", percent: 100 });
+        .eq("id", sendingRequest.id)
+        .then(({ error: updateError }) => {
+          if (updateError) {
+            console.error("Error updating request status after send:", updateError);
+          }
+        });
 
       toast({
         title: "הצלחה",
@@ -756,7 +755,6 @@ export const FileRequestsManager = () => {
       setSendingRequest(null);
       setSelectedFilesDialogCategory("");
       setSelectedFileIds(new Set());
-      fetchRequests();
     } catch (error) {
       console.error("Error in handleSendSelectedFiles:", error);
       if (abortController.signal.aborted) return;
@@ -948,9 +946,7 @@ export const FileRequestsManager = () => {
           continue;
         }
 
-        // Step 3: Update status
-        setBulkSendProgress({ current: i, total: requestsToSend.length, currentEmail: request.email, step: "מעדכן סטטוס..." });
-
+        // Optimistic UI update + fire-and-forget DB sync (don't block the loop).
         setRequests((prev) =>
           prev.map((r) =>
             r.id === request.id
@@ -959,17 +955,18 @@ export const FileRequestsManager = () => {
           )
         );
 
-        const { error: updateError } = await supabase
+        void supabase
           .from("file_requests")
           .update({
             status: "sent",
             sent_date: new Date().toISOString(),
           })
-          .eq("id", request.id);
-
-        if (updateError) {
-          console.error("Error updating bulk request status after send:", updateError);
-        }
+          .eq("id", request.id)
+          .then(({ error: updateError }) => {
+            if (updateError) {
+              console.error("Error updating bulk request status after send:", updateError);
+            }
+          });
 
         successCount++;
         setBulkSendProgress({ current: i + 1, total: requestsToSend.length, currentEmail: request.email, step: "הושלם ✓" });
@@ -1545,7 +1542,13 @@ export const FileRequestsManager = () => {
                             request.status === "handled_not_sent" && "bg-muted text-muted-foreground"
                           )}
                         >
-                          {request.status === "sent" ? "✓ נשלח" : request.status === "handled_not_sent" ? "⊘ טופל - לא נשלח" : "ממתין"}
+                          {request.status === "sent"
+                            ? request.auto_sent
+                              ? "✓ נשלח אוטומטית"
+                              : "✓ נשלח"
+                            : request.status === "handled_not_sent"
+                            ? "⊘ טופל - לא נשלח"
+                            : "ממתין"}
                         </Badge>
                       </TableCell>
                       <TableCell className="py-4">
@@ -1734,7 +1737,13 @@ export const FileRequestsManager = () => {
                             request.status === "handled_not_sent" && "bg-muted text-muted-foreground"
                           )}
                         >
-                          {request.status === "sent" ? "✓ נשלח" : request.status === "handled_not_sent" ? "⊘ טופל - לא נשלח" : "ממתין"}
+                          {request.status === "sent"
+                            ? request.auto_sent
+                              ? "✓ נשלח אוטומטית"
+                              : "✓ נשלח"
+                            : request.status === "handled_not_sent"
+                            ? "⊘ טופל - לא נשלח"
+                            : "ממתין"}
                         </Badge>
                         {isSuspiciousRequest(request) && (
                           <Badge variant="destructive" className="text-xs">
