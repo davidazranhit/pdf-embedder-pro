@@ -723,9 +723,7 @@ export const FileRequestsManager = () => {
         return;
       }
 
-      // Step 3: Updating status
-      setSendProgress({ step: "מעדכן סטטוס...", percent: 90 });
-
+      // Optimistic UI update — files are already sent, close the dialog immediately.
       setRequests((prev) =>
         prev.map((r) =>
           r.id === sendingRequest.id
@@ -734,19 +732,19 @@ export const FileRequestsManager = () => {
         )
       );
 
-      const { error: updateError } = await supabase
+      // Fire-and-forget DB sync — never block the UI on this.
+      void supabase
         .from("file_requests")
         .update({
           status: "sent",
           sent_date: new Date().toISOString(),
         })
-        .eq("id", sendingRequest.id);
-
-      if (updateError) {
-        console.error("Error updating request status after send:", updateError);
-      }
-
-      setSendProgress({ step: "הושלם! ✓", percent: 100 });
+        .eq("id", sendingRequest.id)
+        .then(({ error: updateError }) => {
+          if (updateError) {
+            console.error("Error updating request status after send:", updateError);
+          }
+        });
 
       toast({
         title: "הצלחה",
@@ -757,7 +755,6 @@ export const FileRequestsManager = () => {
       setSendingRequest(null);
       setSelectedFilesDialogCategory("");
       setSelectedFileIds(new Set());
-      fetchRequests();
     } catch (error) {
       console.error("Error in handleSendSelectedFiles:", error);
       if (abortController.signal.aborted) return;
