@@ -169,37 +169,32 @@ const FileRequest = () => {
         // Don't block on notification failure
       }
 
-      // Check if this is a trusted combination and auto-send if so
-      try {
-        const { data: autoSendResult } = await supabase.functions.invoke("auto-send-trusted", {
+      toast({
+        title: "בקשה נשלחה בהצלחה",
+        description: "הבקשה שלך התקבלה ותטופל בהקדם",
+      });
+
+      // Fire-and-forget: trusted-combo auto-send and CS24 access auto-send.
+      // These run in the background after the form returns; the user does not wait.
+      void supabase.functions
+        .invoke("auto-send-trusted", {
           body: {
             email: normalizedEmail,
             id_number: normalizedIdNumber,
             course_name: normalizedCourseName,
-            // request_id omitted intentionally: anonymous users can't SELECT the inserted row due to RLS.
-            // The backend function will locate the latest matching request and update its status.
           },
-        });
+        })
+        .catch((e) => console.error("auto-send-trusted bg error:", e));
 
-        if (autoSendResult?.trusted && autoSendResult?.sent) {
-          toast({
-            title: "הקבצים נשלחו אוטומטית! 🎉",
-            description: `${autoSendResult.fileCount} קבצים נשלחו למייל שלך`,
-          });
-        } else {
-          toast({
-            title: "בקשה נשלחה בהצלחה",
-            description: "הבקשה שלך התקבלה ותעבור לטיפול בהקדם",
-          });
-        }
-      } catch (autoSendError) {
-        console.error("Auto-send check failed:", autoSendError);
-        // Still show success - the request was saved
-        toast({
-          title: "בקשה נשלחה בהצלחה",
-          description: "הבקשה שלך התקבלה ותעבור לטיפול בהקדם",
-        });
-      }
+      void supabase.functions
+        .invoke("cs24-auto-send", {
+          body: {
+            email: normalizedEmail,
+            id_number: normalizedIdNumber,
+            course_name: normalizedCourseName,
+          },
+        })
+        .catch((e) => console.error("cs24-auto-send bg error:", e));
 
       // Clear form
       setEmail("");
