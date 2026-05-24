@@ -62,6 +62,7 @@ interface FileRequest {
   submission_date: string;
   status: "pending" | "sent" | "handled_not_sent";
   sent_date: string | null;
+  auto_sent?: boolean;
 }
 
 interface Template {
