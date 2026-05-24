@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CourseManager } from "@/components/CourseManager";
 import { ApiKeysManager } from "@/components/ApiKeysManager";
+import { Cs24Settings } from "@/components/Cs24Settings";
 import { WebhooksManager } from "@/components/WebhooksManager";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useEditorSettings } from "@/hooks/useEditorSettings";
