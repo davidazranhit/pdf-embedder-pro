@@ -174,27 +174,9 @@ const FileRequest = () => {
         description: "הבקשה שלך התקבלה ותטופל בהקדם",
       });
 
-      // Fire-and-forget: trusted-combo auto-send and CS24 access auto-send.
-      // These run in the background after the form returns; the user does not wait.
-      void supabase.functions
-        .invoke("auto-send-trusted", {
-          body: {
-            email: normalizedEmail,
-            id_number: normalizedIdNumber,
-            course_name: normalizedCourseName,
-          },
-        })
-        .catch((e) => console.error("auto-send-trusted bg error:", e));
-
-      void supabase.functions
-        .invoke("cs24-auto-send", {
-          body: {
-            email: normalizedEmail,
-            id_number: normalizedIdNumber,
-            course_name: normalizedCourseName,
-          },
-        })
-        .catch((e) => console.error("cs24-auto-send bg error:", e));
+      // Auto-send (trusted combinations + CS24 access check) runs entirely
+      // server-side via a database trigger after the row is inserted, so the
+      // visitor's browser never makes these requests (not visible in Network).
 
       // Clear form
       setEmail("");
