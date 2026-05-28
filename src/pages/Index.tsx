@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { buildStoragePath } from "@/lib/utils";
-import { FileCheck, Send, Download, User, Inbox, Settings, BarChart3, Shield } from "lucide-react";
+import { FileCheck, Send, Download, User, Inbox, Settings, BarChart3, Shield, Activity } from "lucide-react";
 import { useUserRole } from "@/hooks/useUserRole";
 
 interface Template {
@@ -525,6 +525,12 @@ ${links.map((l) => {
                       <Button variant="outline" className="flex items-center gap-2">
                         <Shield className="w-4 h-4" />
                         משתמשים
+                      </Button>
+                    </Link>
+                    <Link to="/sys-admin/cs24-logs">
+                      <Button variant="outline" className="flex items-center gap-2">
+                        <Activity className="w-4 h-4" />
+                        לוגי CS24
                       </Button>
                     </Link>
                   </>
