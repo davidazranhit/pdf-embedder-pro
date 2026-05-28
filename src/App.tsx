@@ -10,6 +10,7 @@ import FileRequest from "./pages/FileRequest";
 import Settings from "./pages/Settings";
 import Statistics from "./pages/Statistics";
 import UserManagement from "./pages/UserManagement";
+import Cs24Logs from "./pages/Cs24Logs";
 import FileUnavailable from "./pages/FileUnavailable";
 import NotFound from "./pages/NotFound";
 
@@ -55,6 +56,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <UserManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sys-admin/cs24-logs"
+            element={
+              <ProtectedRoute>
+                <Cs24Logs />
               </ProtectedRoute>
             }
           />

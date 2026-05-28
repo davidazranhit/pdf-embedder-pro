@@ -34,22 +34,57 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const supabase = createClient(supabaseUrl, serviceKey);
+  const startedAt = Date.now();
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const supabase = createClient(supabaseUrl, serviceKey);
 
+  let email = "";
+  let id_number = "";
+  let course_name = "";
+  let request_id: string | undefined;
+
+  const log = async (fields: {
+    outcome: string;
+    reason?: string;
+    api_status?: number | null;
+    matched_student?: unknown;
+    error_message?: string;
+  }) => {
+    try {
+      await supabase.from("cs24_auto_send_logs").insert({
+        email: email || null,
+        id_number: id_number || null,
+        course_name: course_name || null,
+        request_id: request_id ?? null,
+        duration_ms: Date.now() - startedAt,
+        api_status: fields.api_status ?? null,
+        outcome: fields.outcome,
+        reason: fields.reason ?? null,
+        matched_student: fields.matched_student ?? null,
+        error_message: fields.error_message ?? null,
+      });
+    } catch (e) {
+      console.error("cs24 log insert failed:", e);
+    }
+  };
+
+  const respond = (body: Record<string, unknown>, status = 200) =>
+    new Response(JSON.stringify(body), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status,
+    });
+
+  try {
     const payload = (await req.json()) as Payload;
-    const email = (payload.email ?? "").trim().toLowerCase();
-    const id_number = (payload.id_number ?? "").replace(/\D/g, "").padStart(9, "0").slice(-9);
-    const course_name = (payload.course_name ?? "").trim();
-    let request_id = payload.request_id;
+    email = (payload.email ?? "").trim().toLowerCase();
+    id_number = (payload.id_number ?? "").replace(/\D/g, "").padStart(9, "0").slice(-9);
+    course_name = (payload.course_name ?? "").trim();
+    request_id = payload.request_id;
 
     if (!email || !id_number || !course_name) {
-      return new Response(
-        JSON.stringify({ sent: false, reason: "missing_fields" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
-      );
+      await log({ outcome: "skipped", reason: "missing_fields" });
+      return respond({ sent: false, reason: "missing_fields" });
     }
 
     // 1) Suspicious check — never auto-send if user is flagged.
@@ -61,11 +96,8 @@ serve(async (req) => {
       .maybeSingle();
 
     if (suspicious) {
-      console.log("Suspicious combination, skipping auto-send");
-      return new Response(
-        JSON.stringify({ sent: false, reason: "suspicious" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
-      );
+      await log({ outcome: "skipped", reason: "suspicious" });
+      return respond({ sent: false, reason: "suspicious" });
     }
 
     // 1b) Rate-limit: if the user already has 3+ requests for the same course,
@@ -78,11 +110,8 @@ serve(async (req) => {
       .eq("course_name", course_name);
 
     if ((existingCount ?? 0) >= 3) {
-      console.log("User has 3+ requests for this course, skipping auto-send");
-      return new Response(
-        JSON.stringify({ sent: false, reason: "too_many_requests" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
-      );
+      await log({ outcome: "skipped", reason: "too_many_requests" });
+      return respond({ sent: false, reason: "too_many_requests" });
     }
 
     // 2) Load CS24 settings
@@ -97,40 +126,45 @@ serve(async (req) => {
     const baseUrl = (settings?.config as any)?.base_url ?? "https://api.cs24.co.il/tutor/students/export";
 
     if (!apiKey) {
-      console.log("CS24 api key not configured, skipping");
-      return new Response(
-        JSON.stringify({ sent: false, reason: "no_api_key" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
-      );
+      await log({ outcome: "skipped", reason: "no_api_key" });
+      return respond({ sent: false, reason: "no_api_key" });
     }
 
     // 3) Call CS24 API
     const cs24Url = `${baseUrl}?tutor_id=${encodeURIComponent(tutorId)}&api_key=${encodeURIComponent(apiKey)}`;
     const cs24Res = await fetch(cs24Url);
     if (!cs24Res.ok) {
-      console.error("CS24 API error", cs24Res.status, await cs24Res.text());
-      return new Response(
-        JSON.stringify({ sent: false, reason: "cs24_api_error" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
-      );
+      const errText = await cs24Res.text();
+      await log({
+        outcome: "error",
+        reason: "cs24_api_error",
+        api_status: cs24Res.status,
+        error_message: errText.slice(0, 500),
+      });
+      return respond({ sent: false, reason: "cs24_api_error" });
     }
     const cs24Data = await cs24Res.json();
     const rows: Array<{ name?: string; email?: string; course?: string; status?: string }> =
       Array.isArray(cs24Data?.rows) ? cs24Data.rows : Array.isArray(cs24Data) ? cs24Data : [];
 
-    const match = rows.find(
+    const emailMatches = rows.filter(
+      (r) => (r.email ?? "").trim().toLowerCase() === email,
+    );
+    const match = emailMatches.find(
       (r) =>
-        (r.email ?? "").trim().toLowerCase() === email &&
         (r.status ?? "").trim().toLowerCase() === "active" &&
         courseMatches(course_name, r.course ?? ""),
     );
 
     if (!match) {
-      console.log("No active CS24 access for", email, "course", course_name);
-      return new Response(
-        JSON.stringify({ sent: false, reason: "no_access" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
-      );
+      const reason = emailMatches.length === 0 ? "student_not_found" : "no_active_course_access";
+      await log({
+        outcome: "no_match",
+        reason,
+        api_status: cs24Res.status,
+        matched_student: emailMatches.length > 0 ? emailMatches : null,
+      });
+      return respond({ sent: false, reason });
     }
 
     // 4) Locate request_id if not given
@@ -154,11 +188,12 @@ serve(async (req) => {
       .eq("category", course_name);
 
     if (!templates || templates.length === 0) {
-      console.log("No templates found for course", course_name);
-      return new Response(
-        JSON.stringify({ sent: false, reason: "no_templates" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
-      );
+      await log({
+        outcome: "error",
+        reason: "no_templates",
+        matched_student: match,
+      });
+      return respond({ sent: false, reason: "no_templates" });
     }
 
     // 6) Process watermarks
@@ -173,11 +208,15 @@ serve(async (req) => {
     });
 
     if (!processRes.ok) {
-      console.error("process-watermark failed", await processRes.text());
-      return new Response(
-        JSON.stringify({ sent: false, reason: "watermark_failed" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
-      );
+      const errText = await processRes.text();
+      await log({
+        outcome: "error",
+        reason: "watermark_failed",
+        api_status: processRes.status,
+        matched_student: match,
+        error_message: errText.slice(0, 500),
+      });
+      return respond({ sent: false, reason: "watermark_failed" });
     }
 
     const processData = await processRes.json();
@@ -187,10 +226,12 @@ serve(async (req) => {
     }));
 
     if (processedFiles.length === 0) {
-      return new Response(
-        JSON.stringify({ sent: false, reason: "no_processed_files" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
-      );
+      await log({
+        outcome: "error",
+        reason: "no_processed_files",
+        matched_student: match,
+      });
+      return respond({ sent: false, reason: "no_processed_files" });
     }
 
     // 7) Send email
@@ -209,11 +250,15 @@ serve(async (req) => {
     });
 
     if (!sendRes.ok) {
-      console.error("send-watermarked-files failed", await sendRes.text());
-      return new Response(
-        JSON.stringify({ sent: false, reason: "email_failed" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
-      );
+      const errText = await sendRes.text();
+      await log({
+        outcome: "error",
+        reason: "email_failed",
+        api_status: sendRes.status,
+        matched_student: match,
+        error_message: errText.slice(0, 500),
+      });
+      return respond({ sent: false, reason: "email_failed" });
     }
 
     // 8) Mark request as auto-sent
@@ -229,15 +274,20 @@ serve(async (req) => {
       if (updateErr) console.error("Failed to update request status:", updateErr);
     }
 
-    return new Response(
-      JSON.stringify({ sent: true, fileCount: processedFiles.length, auto: true }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
-    );
+    await log({
+      outcome: "sent",
+      reason: "ok",
+      api_status: cs24Res.status,
+      matched_student: match,
+    });
+    return respond({ sent: true, fileCount: processedFiles.length, auto: true });
   } catch (err) {
     console.error("cs24-auto-send error", err);
-    return new Response(
-      JSON.stringify({ sent: false, reason: "exception", error: String(err) }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
-    );
+    await log({
+      outcome: "error",
+      reason: "exception",
+      error_message: String(err).slice(0, 1000),
+    });
+    return respond({ sent: false, reason: "exception", error: String(err) });
   }
 });
