@@ -68,6 +68,23 @@ serve(async (req) => {
       );
     }
 
+    // 1b) Rate-limit: if the user already has 3+ requests for the same course,
+    // do NOT auto-send — let an admin handle it manually.
+    const { count: existingCount } = await supabase
+      .from("file_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("email", email)
+      .eq("id_number", id_number)
+      .eq("course_name", course_name);
+
+    if ((existingCount ?? 0) >= 3) {
+      console.log("User has 3+ requests for this course, skipping auto-send");
+      return new Response(
+        JSON.stringify({ sent: false, reason: "too_many_requests" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+      );
+    }
+
     // 2) Load CS24 settings
     const { data: settings } = await supabase
       .from("external_api_settings")
