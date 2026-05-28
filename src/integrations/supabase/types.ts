@@ -146,6 +146,51 @@ export type Database = {
         }
         Relationships: []
       }
+      cs24_auto_send_logs: {
+        Row: {
+          api_status: number | null
+          course_name: string | null
+          created_at: string
+          duration_ms: number | null
+          email: string | null
+          error_message: string | null
+          id: string
+          id_number: string | null
+          matched_student: Json | null
+          outcome: string
+          reason: string | null
+          request_id: string | null
+        }
+        Insert: {
+          api_status?: number | null
+          course_name?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          email?: string | null
+          error_message?: string | null
+          id?: string
+          id_number?: string | null
+          matched_student?: Json | null
+          outcome: string
+          reason?: string | null
+          request_id?: string | null
+        }
+        Update: {
+          api_status?: number | null
+          course_name?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          email?: string | null
+          error_message?: string | null
+          id?: string
+          id_number?: string | null
+          matched_student?: Json | null
+          outcome?: string
+          reason?: string | null
+          request_id?: string | null
+        }
+        Relationships: []
+      }
       download_logs: {
         Row: {
           downloaded_at: string
