@@ -723,28 +723,26 @@ export const FileRequestsManager = () => {
         return;
       }
 
-      // Optimistic UI update — files are already sent, close the dialog immediately.
-      setRequests((prev) =>
-        prev.map((r) =>
-          r.id === sendingRequest.id
-            ? { ...r, status: "sent", sent_date: new Date().toISOString() }
-            : r
-        )
-      );
-
-      // Fire-and-forget DB sync — never block the UI on this.
-      void supabase
+      // Persist status BEFORE closing the dialog so a refresh never resurrects "pending".
+      const sentAt = new Date().toISOString();
+      const { error: updateError } = await supabase
         .from("file_requests")
-        .update({
-          status: "sent",
-          sent_date: new Date().toISOString(),
-        })
-        .eq("id", sendingRequest.id)
-        .then(({ error: updateError }) => {
-          if (updateError) {
-            console.error("Error updating request status after send:", updateError);
-          }
+        .update({ status: "sent", sent_date: sentAt })
+        .eq("id", sendingRequest.id);
+      if (updateError) {
+        console.error("Error updating request status after send:", updateError);
+        toast({
+          title: "אזהרה",
+          description: "הקבצים נשלחו אך עדכון הסטטוס נכשל. רענן ונסה לסמן ידנית.",
+          variant: "destructive",
         });
+      } else {
+        setRequests((prev) =>
+          prev.map((r) =>
+            r.id === sendingRequest.id ? { ...r, status: "sent", sent_date: sentAt } : r
+          )
+        );
+      }
 
       toast({
         title: "הצלחה",
@@ -946,27 +944,22 @@ export const FileRequestsManager = () => {
           continue;
         }
 
-        // Optimistic UI update + fire-and-forget DB sync (don't block the loop).
+        // Persist status BEFORE moving on so the final fetchRequests() can't race it.
+        const sentAt = new Date().toISOString();
+        const { error: updateError } = await supabase
+          .from("file_requests")
+          .update({ status: "sent", sent_date: sentAt })
+          .eq("id", request.id);
+        if (updateError) {
+          console.error("Error updating bulk request status after send:", updateError);
+          errorCount++;
+          continue;
+        }
         setRequests((prev) =>
           prev.map((r) =>
-            r.id === request.id
-              ? { ...r, status: "sent", sent_date: new Date().toISOString() }
-              : r
+            r.id === request.id ? { ...r, status: "sent", sent_date: sentAt } : r
           )
         );
-
-        void supabase
-          .from("file_requests")
-          .update({
-            status: "sent",
-            sent_date: new Date().toISOString(),
-          })
-          .eq("id", request.id)
-          .then(({ error: updateError }) => {
-            if (updateError) {
-              console.error("Error updating bulk request status after send:", updateError);
-            }
-          });
 
         successCount++;
         setBulkSendProgress({ current: i + 1, total: requestsToSend.length, currentEmail: request.email, step: "הושלם ✓" });

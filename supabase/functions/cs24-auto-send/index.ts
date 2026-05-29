@@ -87,7 +87,9 @@ serve(async (req) => {
       return respond({ sent: false, reason: "missing_fields" });
     }
 
-    // 1) Suspicious check — never auto-send if user is flagged.
+    // 1) Suspicious check — never auto-send if user is flagged manually
+    //    OR derived as suspicious (same email used with multiple IDs,
+    //    or same ID used with multiple emails across file_requests).
     const { data: suspicious } = await supabase
       .from("suspicious_combinations")
       .select("id")
@@ -96,8 +98,32 @@ serve(async (req) => {
       .maybeSingle();
 
     if (suspicious) {
-      await log({ outcome: "skipped", reason: "suspicious" });
+      await log({ outcome: "skipped", reason: "suspicious_manual" });
       return respond({ sent: false, reason: "suspicious" });
+    }
+
+    const { data: sameIdRows } = await supabase
+      .from("file_requests")
+      .select("email")
+      .eq("id_number", id_number);
+    const distinctEmails = new Set(
+      (sameIdRows ?? []).map((r) => (r.email ?? "").trim().toLowerCase()).filter(Boolean),
+    );
+    if (distinctEmails.size > 1) {
+      await log({ outcome: "skipped", reason: "suspicious_id_multi_email" });
+      return respond({ sent: false, reason: "suspicious_id_multi_email" });
+    }
+
+    const { data: sameEmailRows } = await supabase
+      .from("file_requests")
+      .select("id_number")
+      .eq("email", email);
+    const distinctIds = new Set(
+      (sameEmailRows ?? []).map((r) => (r.id_number ?? "").trim()).filter(Boolean),
+    );
+    if (distinctIds.size > 1) {
+      await log({ outcome: "skipped", reason: "suspicious_email_multi_id" });
+      return respond({ sent: false, reason: "suspicious_email_multi_id" });
     }
 
     // 1b) Rate-limit: if the user already has 3+ requests for the same course,
@@ -130,9 +156,17 @@ serve(async (req) => {
       return respond({ sent: false, reason: "no_api_key" });
     }
 
-    // 3) Call CS24 API
-    const cs24Url = `${baseUrl}?tutor_id=${encodeURIComponent(tutorId)}&api_key=${encodeURIComponent(apiKey)}`;
-    const cs24Res = await fetch(cs24Url);
+    // 3) Call CS24 API — always bypass any caching layer (browser/CDN/Deno).
+    const cs24Url =
+      `${baseUrl}?tutor_id=${encodeURIComponent(tutorId)}&api_key=${encodeURIComponent(apiKey)}` +
+      `&_ts=${Date.now()}`;
+    const cs24Res = await fetch(cs24Url, {
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+      },
+    });
     if (!cs24Res.ok) {
       const errText = await cs24Res.text();
       await log({
