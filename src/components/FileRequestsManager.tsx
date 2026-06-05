@@ -1146,17 +1146,15 @@ export const FileRequestsManager = () => {
               <Button
                 variant="outline"
                 onClick={() => {
-                  if (isSendingFiles) {
-                    handleCancelSend();
-                    return;
-                  }
+                  if (isSendingFiles) return;
                   setShowFileSendDialog(false);
                   setSendingRequest(null);
                   setSelectedFilesDialogCategory("");
                   setSelectedFileIds(new Set());
                 }}
+                disabled={isSendingFiles}
               >
-                {isSendingFiles ? "עצור שליחה" : "ביטול"}
+                ביטול
               </Button>
               <Button
                 onClick={handleSendSelectedFiles}
