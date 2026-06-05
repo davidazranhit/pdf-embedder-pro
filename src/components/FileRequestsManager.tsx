@@ -125,7 +125,6 @@ export const FileRequestsManager = () => {
   const [sendingRequest, setSendingRequest] = useState<FileRequest | null>(null);
   const [isSendingFiles, setIsSendingFiles] = useState(false);
   const [sendProgress, setSendProgress] = useState<{ step: string; percent: number }>({ step: "", percent: 0 });
-  const [sendAbortController, setSendAbortController] = useState<AbortController | null>(null);
   
   // Bulk selection state
   const [selectedRequestIds, setSelectedRequestIds] = useState<Set<string>>(new Set());
@@ -608,88 +607,69 @@ export const FileRequestsManager = () => {
    * Returns a discriminated result instead of throwing — callers handle UI.
    */
   type SendResult =
-    | { ok: true; processedCount: number; error?: undefined }
+    | { ok: true; processedCount: number; sentAt: string; error?: undefined }
     | { ok: false; processedCount?: undefined; error: string };
 
   const sendFilesForRequest = async (params: {
     request: FileRequest;
     fileIds: string[];
-    signal?: AbortSignal;
     onProgress?: (step: string, percent: number) => void;
   }): Promise<SendResult> => {
-    const { request, fileIds, signal, onProgress } = params;
+    const { request, fileIds, onProgress } = params;
 
-    onProgress?.("מעבד סימני מים...", 15);
+    onProgress?.("מעבד ושולח קבצים...", 65);
 
-    const { data: processData, error: processError } = await invokeWithRetry({
-      functionName: "process-watermark",
+    const { data, error } = await invokeWithRetry<{
+      success: boolean;
+      fileCount: number;
+      sentAt: string;
+      alreadySent?: boolean;
+    }>({
+      functionName: "send-request-files",
       body: {
+        requestId: request.id,
         fileIds,
-        email: request.email,
-        userId: request.id_number,
       },
-      timeoutMs: 45_000,
-      retries: 1,
-      signal,
-      skipSession: true,
+      timeoutMs: 120_000,
+      retries: 0,
       onAttempt: (attempt) => {
         onProgress?.(
           attempt === 0
-            ? "מעבד סימני מים..."
-            : `מעבד סימני מים... (ניסיון ${attempt + 1})`,
-          attempt === 0 ? 15 : 20,
+            ? "מעבד ושולח קבצים..."
+            : `מעבד ושולח קבצים... (ניסיון ${attempt + 1})`,
+          65,
         );
       },
     });
 
-    if (signal?.aborted) return { ok: false, error: "בוטל" };
-
-    if (processError || !processData?.files || processData.files.length === 0) {
-      console.error("process-watermark failed", { email: request.email, processError });
+    if (error || !data?.success) {
+      console.error("send-request-files failed", { email: request.email, error });
       return {
         ok: false,
-        error: processError?.message || "לא הצלחנו לעבד את הקבצים. נסה שוב.",
+        error: error?.message || "לא הצלחנו לשלוח את הקבצים. נסה שוב.",
       };
     }
 
-    onProgress?.("קבצים עובדו בהצלחה!", 60);
+    onProgress?.("הושלם ✓", 100);
 
-    const processedFiles = processData.files.map((f: any) => ({
-      processedId: f.processedId,
-      originalName: f.originalName,
-    }));
+    return {
+      ok: true,
+      processedCount: data.fileCount,
+      sentAt: data.sentAt,
+    };
+  };
 
-    onProgress?.("שולח מייל...", 75);
-
-    const { error: sendError } = await invokeWithRetry({
-      functionName: "send-watermarked-files",
-      body: {
-        email: request.email,
-        fileIds: processedFiles,
-        courseName: request.course_name,
-        idNumber: request.id_number,
-      },
-      timeoutMs: 30_000,
-      retries: 1,
-      signal,
-      skipSession: true,
-    });
-
-    if (signal?.aborted) return { ok: false, error: "בוטל" };
-
-    if (sendError) {
-      console.error("send-watermarked-files failed", { email: request.email, sendError });
-      return { ok: false, error: sendError.message || "שגיאה בשליחת המייל" };
-    }
-
-    return { ok: true, processedCount: processedFiles.length };
+  const markRequestAsSentLocally = (requestId: string, sentAt: string) => {
+    setRequests((prev) =>
+      prev.map((r) =>
+        r.id === requestId ? { ...r, status: "sent", sent_date: sentAt, auto_sent: false } : r
+      )
+    );
   };
 
   const handleSendSelectedFiles = async () => {
     if (!sendingRequest || selectedFileIds.size === 0) return;
 
-    const abortController = new AbortController();
-    setSendAbortController(abortController);
     setIsSendingFiles(true);
     try {
       // Get selected templates
@@ -708,11 +688,8 @@ export const FileRequestsManager = () => {
       const result = await sendFilesForRequest({
         request: sendingRequest,
         fileIds: allFileIds,
-        signal: abortController.signal,
         onProgress: (step, percent) => setSendProgress({ step, percent }),
       });
-
-      if (abortController.signal.aborted) return;
 
       if (!result.ok) {
         toast({
@@ -723,26 +700,7 @@ export const FileRequestsManager = () => {
         return;
       }
 
-      // Persist status BEFORE closing the dialog so a refresh never resurrects "pending".
-      const sentAt = new Date().toISOString();
-      const { error: updateError } = await supabase
-        .from("file_requests")
-        .update({ status: "sent", sent_date: sentAt })
-        .eq("id", sendingRequest.id);
-      if (updateError) {
-        console.error("Error updating request status after send:", updateError);
-        toast({
-          title: "אזהרה",
-          description: "הקבצים נשלחו אך עדכון הסטטוס נכשל. רענן ונסה לסמן ידנית.",
-          variant: "destructive",
-        });
-      } else {
-        setRequests((prev) =>
-          prev.map((r) =>
-            r.id === sendingRequest.id ? { ...r, status: "sent", sent_date: sentAt } : r
-          )
-        );
-      }
+      markRequestAsSentLocally(sendingRequest.id, result.sentAt);
 
       toast({
         title: "הצלחה",
@@ -755,7 +713,6 @@ export const FileRequestsManager = () => {
       setSelectedFileIds(new Set());
     } catch (error) {
       console.error("Error in handleSendSelectedFiles:", error);
-      if (abortController.signal.aborted) return;
       toast({
         title: "שגיאה",
         description: "שגיאה כללית בתהליך השליחה",
@@ -764,16 +721,8 @@ export const FileRequestsManager = () => {
     } finally {
       setIsSendingFiles(false);
       setSendProgress({ step: "", percent: 0 });
-      setSendAbortController(null);
+      fetchRequests();
     }
-  };
-
-  const handleCancelSend = () => {
-    sendAbortController?.abort();
-    setIsSendingFiles(false);
-    setSendProgress({ step: "", percent: 0 });
-    setSendAbortController(null);
-    toast({ title: "השליחה בוטלה", description: "התהליך נעצר" });
   };
 
   const handleQuickFilter = (value: string) => {
@@ -944,22 +893,7 @@ export const FileRequestsManager = () => {
           continue;
         }
 
-        // Persist status BEFORE moving on so the final fetchRequests() can't race it.
-        const sentAt = new Date().toISOString();
-        const { error: updateError } = await supabase
-          .from("file_requests")
-          .update({ status: "sent", sent_date: sentAt })
-          .eq("id", request.id);
-        if (updateError) {
-          console.error("Error updating bulk request status after send:", updateError);
-          errorCount++;
-          continue;
-        }
-        setRequests((prev) =>
-          prev.map((r) =>
-            r.id === request.id ? { ...r, status: "sent", sent_date: sentAt } : r
-          )
-        );
+        markRequestAsSentLocally(request.id, result.sentAt);
 
         successCount++;
         setBulkSendProgress({ current: i + 1, total: requestsToSend.length, currentEmail: request.email, step: "הושלם ✓" });
@@ -1199,17 +1133,15 @@ export const FileRequestsManager = () => {
               <Button
                 variant="outline"
                 onClick={() => {
-                  if (isSendingFiles) {
-                    handleCancelSend();
-                    return;
-                  }
+                  if (isSendingFiles) return;
                   setShowFileSendDialog(false);
                   setSendingRequest(null);
                   setSelectedFilesDialogCategory("");
                   setSelectedFileIds(new Set());
                 }}
+                disabled={isSendingFiles}
               >
-                {isSendingFiles ? "עצור שליחה" : "ביטול"}
+                ביטול
               </Button>
               <Button
                 onClick={handleSendSelectedFiles}
