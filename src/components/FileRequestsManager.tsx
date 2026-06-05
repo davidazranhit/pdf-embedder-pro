@@ -650,6 +650,8 @@ export const FileRequestsManager = () => {
       };
     }
 
+    onProgress?.("הושלם ✓", 100);
+
     return {
       ok: true,
       processedCount: data.fileCount,
@@ -891,22 +893,7 @@ export const FileRequestsManager = () => {
           continue;
         }
 
-        // Persist status BEFORE moving on so the final fetchRequests() can't race it.
-        const sentAt = new Date().toISOString();
-        const { error: updateError } = await supabase
-          .from("file_requests")
-          .update({ status: "sent", sent_date: sentAt })
-          .eq("id", request.id);
-        if (updateError) {
-          console.error("Error updating bulk request status after send:", updateError);
-          errorCount++;
-          continue;
-        }
-        setRequests((prev) =>
-          prev.map((r) =>
-            r.id === request.id ? { ...r, status: "sent", sent_date: sentAt } : r
-          )
-        );
+        markRequestAsSentLocally(request.id, result.sentAt);
 
         successCount++;
         setBulkSendProgress({ current: i + 1, total: requestsToSend.length, currentEmail: request.email, step: "הושלם ✓" });
