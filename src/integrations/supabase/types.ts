@@ -509,6 +509,7 @@ export type Database = {
           pending_alert_threshold: number | null
           position_settings: Json | null
           positions: Json
+          terms_of_service: string
           updated_at: string | null
         }
         Insert: {
@@ -538,6 +539,7 @@ export type Database = {
           pending_alert_threshold?: number | null
           position_settings?: Json | null
           positions?: Json
+          terms_of_service?: string
           updated_at?: string | null
         }
         Update: {
@@ -567,6 +569,7 @@ export type Database = {
           pending_alert_threshold?: number | null
           position_settings?: Json | null
           positions?: Json
+          terms_of_service?: string
           updated_at?: string | null
         }
         Relationships: []

@@ -53,6 +53,7 @@ const FileRequest = () => {
   const [formTitle, setFormTitle] = useState("בקשת קבצים");
   const [formInstructions, setFormInstructions] = useState("הוראות למילוי:\n\nעליך להזין מייל ותעודת זהות וקורס מבוקש.\n\nלאחר שליחת הבקשה הפרטים יועברו לבדיקה ולאחר אישור (אין טעם לעדכן ששלחתם את הבקשה, היא תטופל בהקדם) יישלחו הקבצים המבוקשים ישירות למייל עם הפרטים האישיים מוטמעים על הקבצים למניעת שיתוף והפצה.");
   const [formWarning, setFormWarning] = useState("כל ניסיון שיתוף או הפצת הקבצים מהווה הפרה חמורה של זכויות יוצרים ויטופל בהתאם");
+  const [termsOfService, setTermsOfService] = useState<string>("");
   const { toast } = useToast();
 
   const normalizeEmail = (value: string) => value.trim().toLowerCase();
@@ -74,7 +75,7 @@ const FileRequest = () => {
     try {
       const { data, error } = await supabase
         .from("watermark_settings")
-        .select("form_title, form_instructions, form_warning")
+        .select("form_title, form_instructions, form_warning, terms_of_service")
         .eq("id", "00000000-0000-0000-0000-000000000001")
         .single();
 
@@ -84,6 +85,7 @@ const FileRequest = () => {
         setFormTitle(data.form_title ?? "בקשת קבצים");
         setFormInstructions(data.form_instructions ?? "הוראות למילוי:\n\nעליך להזין מייל ותעודת זהות וקורס מבוקש.\n\nלאחר שליחת הבקשה הפרטים יועברו לבדיקה ולאחר אישור (אין טעות לעדכן ששלחתם את הבקשה, היא תטופל בהקדם) יישלחו הקבצים המבוקשים ישירות למייל עם הפרטים האישיים מוטמעים על הקבצים למניעת שיתוף והפצה.");
         setFormWarning(data.form_warning ?? "כל ניסיון שיתוף או הפצת הקבצים מהווה הפרה חמורה של זכויות יוצרים ויטופל בהתאם");
+        setTermsOfService((data as any).terms_of_service ?? "");
       }
     } catch (error) {
       console.error("Error loading form texts:", error);
@@ -361,21 +363,7 @@ const FileRequest = () => {
               <DialogTitle className="text-right">תנאי שימוש</DialogTitle>
             </DialogHeader>
             <div className="text-sm text-muted-foreground space-y-3 text-right max-h-[60vh] overflow-y-auto">
-              <p>
-                בעת מילוי טופס זה, הנך מצהיר/ה כי כל הפרטים שנמסרו על ידך (לרבות כתובת מייל, תעודת זהות, שם קורס וכל מידע נוסף) הינם נכונים, מדויקים ושייכים לך באופן אישי.
-              </p>
-              <p>
-                האחריות המלאה והבלעדית לתוכן המידע שנמסר ולנכונותו מוטלת על ממלא/ת הטופס בלבד. מסירת פרטים שגויים, חלקיים או שאינם שייכים למוסר הפרטים הינה באחריותו המלאה.
-              </p>
-              <p>
-                הקבצים הנשלחים מוטמעים בפרטים אישיים המזהים את מקבל הקובץ. כל שיתוף, העברה, העתקה, הפצה או פרסום של הקבצים — בכל אמצעי שהוא — אסורים בהחלט ומהווים הפרה של זכויות יוצרים אשר עלולה לגרור צעדים משפטיים.
-              </p>
-              <p>
-                המידע שנמסר ישמש לצורך מתן השירות, אימות הזכאות ותיעוד פנימי בלבד, ולא יועבר לצדדים שלישיים אלא בהתאם להוראות הדין.
-              </p>
-              <p>
-                שליחת הטופס מהווה הסכמה מלאה לתנאים אלו.
-              </p>
+              <p className="whitespace-pre-wrap">{termsOfService}</p>
             </div>
             <DialogFooter className="flex-row justify-start gap-2 sm:justify-start">
               <Button
