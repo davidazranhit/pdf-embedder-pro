@@ -5,6 +5,14 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { validateIsraeliID } from "@/lib/idValidation";
@@ -40,6 +48,8 @@ const FileRequest = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
   const [editorNotFound, setEditorNotFound] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
   const [formTitle, setFormTitle] = useState("בקשת קבצים");
   const [formInstructions, setFormInstructions] = useState("הוראות למילוי:\n\nעליך להזין מייל ותעודת זהות וקורס מבוקש.\n\nלאחר שליחת הבקשה הפרטים יועברו לבדיקה ולאחר אישור (אין טעם לעדכן ששלחתם את הבקשה, היא תטופל בהקדם) יישלחו הקבצים המבוקשים ישירות למייל עם הפרטים האישיים מוטמעים על הקבצים למניעת שיתוף והפצה.");
   const [formWarning, setFormWarning] = useState("כל ניסיון שיתוף או הפצת הקבצים מהווה הפרה חמורה של זכויות יוצרים ויטופל בהתאם");
@@ -142,6 +152,15 @@ const FileRequest = () => {
       return;
     }
 
+    if (!agreedToTerms) {
+      toast({
+        title: "נדרש אישור תנאי שימוש",
+        description: "יש לאשר את תנאי השימוש כדי לשלוח את הבקשה",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -183,6 +202,7 @@ const FileRequest = () => {
       setIdNumber("");
       setCourseName("");
       setNotes("");
+      setAgreedToTerms(false);
     } catch (error) {
       console.error("Error submitting request:", error);
       toast({
