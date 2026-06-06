@@ -51,6 +51,7 @@ const Settings = () => {
   const [formTitle, setFormTitle] = useState<string>("בקשת קבצים");
   const [formInstructions, setFormInstructions] = useState<string>("הוראות למילוי:\n\nעליך להזין מייל ותעודת זהות וקורס מבוקש.\n\nלאחר שליחת הבקשה הפרטים יועברו לבדיקה ולאחר אישור (אין טעם לעדכן ששלחתם את הבקשה, היא תטופל בהקדם) יישלחו הקבצים המבוקשים ישירות למייל עם הפרטים האישיים מוטמעים על הקבצים למניעת שיתוף והפצה.");
   const [formWarning, setFormWarning] = useState<string>("כל ניסיון שיתוף או הפצת הקבצים מהווה הפרה חמורה של זכויות יוצרים ויטופל בהתאם");
+  const [termsOfService, setTermsOfService] = useState<string>("");
   const [coverEmailLabel, setCoverEmailLabel] = useState<string>("אימייל");
   const [coverIdLabel, setCoverIdLabel] = useState<string>("תעודת זהות");
   const [coverSuccessText, setCoverSuccessText] = useState<string>("בהצלחה!");
@@ -93,6 +94,7 @@ const Settings = () => {
         setFormTitle(data.form_title ?? "בקשת קבצים");
         setFormInstructions(data.form_instructions ?? "הוראות למילוי:\n\nעליך להזין מייל ותעודת זהות וקורס מבוקש.\n\nלאחר שליחת הבקשה הפרטים יועברו לבדיקה ולאחר אישור (אין טעם לעדכן ששלחתם את הבקשה, היא תטופל בהקדם) יישלחו הקבצים המבוקשים ישירות למייל עם הפרטים האישיים מוטמעים על הקבצים למניעת שיתוף והפצה.");
         setFormWarning(data.form_warning ?? "כל ניסיון שיתוף או הפצת הקבצים מהווה הפרה חמורה של זכויות יוצרים ויטופל בהתאם");
+        setTermsOfService((data as any).terms_of_service ?? "");
         setCoverEmailLabel(data.cover_email_label ?? "אימייל");
         setCoverIdLabel(data.cover_id_label ?? "תעודת זהות");
         setCoverSuccessText(data.cover_success_text ?? "בהצלחה!");
@@ -151,6 +153,7 @@ const Settings = () => {
           form_title: formTitle,
           form_instructions: formInstructions,
           form_warning: formWarning,
+          terms_of_service: termsOfService,
           cover_email_label: coverEmailLabel,
           cover_id_label: coverIdLabel,
           cover_success_text: coverSuccessText,
