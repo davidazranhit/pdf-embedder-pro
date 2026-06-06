@@ -536,6 +536,22 @@ const Settings = () => {
                       placeholder="הכנס את האזהרה על זכויות יוצרים"
                     />
                   </div>
+
+                  {/* Terms of Service */}
+                  <div className="space-y-3 mb-6">
+                    <Label className="text-base font-medium">
+                      תנאי שימוש (מוצגים בדיאלוג בטופס)
+                    </Label>
+                    <Textarea
+                      value={termsOfService}
+                      onChange={(e) => setTermsOfService(e.target.value)}
+                      className="w-full min-h-[250px]"
+                      placeholder="הכנס את תנאי השימוש המוצגים למשתמשים"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      הטקסט יוצג בדיאלוג שנפתח בלחיצה על "תנאי השימוש" בטופס בקשת הקבצים.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Cover Page Section */}
