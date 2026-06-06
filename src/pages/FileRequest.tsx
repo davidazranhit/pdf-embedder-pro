@@ -53,6 +53,7 @@ const FileRequest = () => {
   const [formTitle, setFormTitle] = useState("בקשת קבצים");
   const [formInstructions, setFormInstructions] = useState("הוראות למילוי:\n\nעליך להזין מייל ותעודת זהות וקורס מבוקש.\n\nלאחר שליחת הבקשה הפרטים יועברו לבדיקה ולאחר אישור (אין טעם לעדכן ששלחתם את הבקשה, היא תטופל בהקדם) יישלחו הקבצים המבוקשים ישירות למייל עם הפרטים האישיים מוטמעים על הקבצים למניעת שיתוף והפצה.");
   const [formWarning, setFormWarning] = useState("כל ניסיון שיתוף או הפצת הקבצים מהווה הפרה חמורה של זכויות יוצרים ויטופל בהתאם");
+  const [termsOfService, setTermsOfService] = useState<string>("");
   const { toast } = useToast();
 
   const normalizeEmail = (value: string) => value.trim().toLowerCase();
@@ -74,7 +75,7 @@ const FileRequest = () => {
     try {
       const { data, error } = await supabase
         .from("watermark_settings")
-        .select("form_title, form_instructions, form_warning")
+        .select("form_title, form_instructions, form_warning, terms_of_service")
         .eq("id", "00000000-0000-0000-0000-000000000001")
         .single();
 
@@ -84,6 +85,7 @@ const FileRequest = () => {
         setFormTitle(data.form_title ?? "בקשת קבצים");
         setFormInstructions(data.form_instructions ?? "הוראות למילוי:\n\nעליך להזין מייל ותעודת זהות וקורס מבוקש.\n\nלאחר שליחת הבקשה הפרטים יועברו לבדיקה ולאחר אישור (אין טעות לעדכן ששלחתם את הבקשה, היא תטופל בהקדם) יישלחו הקבצים המבוקשים ישירות למייל עם הפרטים האישיים מוטמעים על הקבצים למניעת שיתוף והפצה.");
         setFormWarning(data.form_warning ?? "כל ניסיון שיתוף או הפצת הקבצים מהווה הפרה חמורה של זכויות יוצרים ויטופל בהתאם");
+        setTermsOfService((data as any).terms_of_service ?? "");
       }
     } catch (error) {
       console.error("Error loading form texts:", error);
