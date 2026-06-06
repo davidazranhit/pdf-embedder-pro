@@ -328,13 +328,78 @@ const FileRequest = () => {
           <Button
             type="submit"
             className="w-full"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !agreedToTerms}
             size="lg"
           >
             <Send className="w-4 h-4 ml-2" />
             {isSubmitting ? "שולח..." : "שלח בקשה"}
           </Button>
+
+          <div className="flex items-start gap-2 pt-1" dir="rtl">
+            <Checkbox
+              id="terms"
+              checked={agreedToTerms}
+              onCheckedChange={(checked) => setAgreedToTerms(checked === true)}
+              className="mt-1"
+            />
+            <Label htmlFor="terms" className="text-sm font-normal leading-relaxed cursor-pointer">
+              אני מאשר/ת את{" "}
+              <button
+                type="button"
+                onClick={() => setTermsOpen(true)}
+                className="text-primary underline hover:no-underline"
+              >
+                תנאי השימוש
+              </button>
+            </Label>
+          </div>
         </form>
+
+        <Dialog open={termsOpen} onOpenChange={setTermsOpen}>
+          <DialogContent dir="rtl" className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="text-right">תנאי שימוש</DialogTitle>
+            </DialogHeader>
+            <div className="text-sm text-muted-foreground space-y-3 text-right max-h-[60vh] overflow-y-auto">
+              <p>
+                בעת מילוי טופס זה, הנך מצהיר/ה כי כל הפרטים שנמסרו על ידך (לרבות כתובת מייל, תעודת זהות, שם קורס וכל מידע נוסף) הינם נכונים, מדויקים ושייכים לך באופן אישי.
+              </p>
+              <p>
+                האחריות המלאה והבלעדית לתוכן המידע שנמסר ולנכונותו מוטלת על ממלא/ת הטופס בלבד. מסירת פרטים שגויים, חלקיים או שאינם שייכים למוסר הפרטים הינה באחריותו המלאה.
+              </p>
+              <p>
+                הקבצים הנשלחים מוטמעים בפרטים אישיים המזהים את מקבל הקובץ. כל שיתוף, העברה, העתקה, הפצה או פרסום של הקבצים — בכל אמצעי שהוא — אסורים בהחלט ומהווים הפרה של זכויות יוצרים אשר עלולה לגרור צעדים משפטיים.
+              </p>
+              <p>
+                המידע שנמסר ישמש לצורך מתן השירות, אימות הזכאות ותיעוד פנימי בלבד, ולא יועבר לצדדים שלישיים אלא בהתאם להוראות הדין.
+              </p>
+              <p>
+                שליחת הטופס מהווה הסכמה מלאה לתנאים אלו.
+              </p>
+            </div>
+            <DialogFooter className="flex-row justify-start gap-2 sm:justify-start">
+              <Button
+                type="button"
+                onClick={() => {
+                  setAgreedToTerms(true);
+                  setTermsOpen(false);
+                }}
+              >
+                מאשר/ת
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setAgreedToTerms(false);
+                  setTermsOpen(false);
+                }}
+              >
+                לא מאשר/ת
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </Card>
     </div>
   );
