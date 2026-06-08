@@ -1,12 +1,59 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import { PDFDocument, rgb, StandardFonts, degrees } from "https://esm.sh/pdf-lib@1.17.1";
+import { PDFDocument, PDFName, PDFString, rgb, StandardFonts, degrees } from "https://esm.sh/pdf-lib@1.17.1";
 import fontkit from "https://esm.sh/@pdf-lib/fontkit@1.1.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// ── Cryptographic fingerprint helpers ──
+// Produces an HMAC-SHA256 hex digest of (email|userId) using the service role key as secret.
+// This fingerprint is embedded in multiple invisible locations across the PDF so that a
+// leaked file can be traced back to a specific user even if visible watermarks are removed.
+async function computeFingerprint(email: string, userId: string): Promise<string> {
+  const secret = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "fallback-secret-key";
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(`${email}|${userId}`)
+  );
+  return Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function buildXmpMetadata(email: string, userId: string, fingerprint: string): string {
+  const timestamp = new Date().toISOString();
+  const tracingId = `${fingerprint.slice(0, 16)}-${userId}`;
+  return `<?xpacket begin="\uFEFF" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="DPS-Trace 1.0">
+  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+    <rdf:Description rdf:about=""
+      xmlns:dc="http://purl.org/dc/elements/1.1/"
+      xmlns:xmp="http://ns.adobe.com/xap/1.0/"
+      xmlns:pdf="http://ns.adobe.com/pdf/1.3/"
+      xmlns:dps="http://davids-pdf-system.local/trace/1.0/">
+      <dc:creator><rdf:Seq><rdf:li>${email}</rdf:li></rdf:Seq></dc:creator>
+      <xmp:CreateDate>${timestamp}</xmp:CreateDate>
+      <xmp:ModifyDate>${timestamp}</xmp:ModifyDate>
+      <dps:Fingerprint>${fingerprint}</dps:Fingerprint>
+      <dps:TraceId>${tracingId}</dps:TraceId>
+      <dps:OwnerHash>${fingerprint.slice(0, 32)}</dps:OwnerHash>
+      <dps:IssuedAt>${timestamp}</dps:IssuedAt>
+    </rdf:Description>
+  </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>`;
+}
 
 // Sanitize file names for storage keys (ASCII-only, safe characters)
 function sanitizeFileName(name: string) {
