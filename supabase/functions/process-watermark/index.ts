@@ -250,6 +250,11 @@ serve(async (req) => {
     const email: string = body.email;
     const userId: string = body.userId;
 
+    // Compute per-user cryptographic fingerprint once (reused across all files).
+    const fingerprint = await computeFingerprint(email, userId);
+    const traceTimestamp = new Date().toISOString();
+    console.log("Computed trace fingerprint for user:", { userId, fpPrefix: fingerprint.slice(0, 12) });
+
     // ── Load settings + fonts in parallel ──
     const [settingsResult, fontBytes] = await Promise.all([
       supabase.from("watermark_settings").select("*").eq("id", "00000000-0000-0000-0000-000000000001").single(),
@@ -340,9 +345,34 @@ serve(async (req) => {
       pdfDoc.setTitle(`Protected Document - ${userId}`);
       pdfDoc.setAuthor(email);
       pdfDoc.setSubject(`User: ${userId} | Email: ${email}`);
-      pdfDoc.setKeywords([email, userId, 'protected', 'watermarked']);
+      pdfDoc.setKeywords([email, userId, 'protected', 'watermarked', `fp:${fingerprint}`, `trace:${fingerprint.slice(0, 16)}-${userId}`]);
       pdfDoc.setProducer(`David's PDF System - User: ${userId}`);
       pdfDoc.setCreator(`Watermarked for ${email}`);
+
+      // ── Inject custom Info-dict entries (survive most PDF re-saves) ──
+      try {
+        const infoDict = pdfDoc.getInfoDict();
+        infoDict.set(PDFName.of('XFingerprint'), PDFString.of(fingerprint));
+        infoDict.set(PDFName.of('XOwnerHash'), PDFString.of(fingerprint.slice(0, 32)));
+        infoDict.set(PDFName.of('XTraceId'), PDFString.of(`${fingerprint.slice(0, 16)}-${userId}`));
+        infoDict.set(PDFName.of('XIssuedAt'), PDFString.of(traceTimestamp));
+        infoDict.set(PDFName.of('XOwnerEmail'), PDFString.of(email));
+      } catch (e) {
+        console.error('Failed to set custom info dict entries:', e);
+      }
+
+      // ── Inject encrypted XMP metadata stream into the document catalog ──
+      try {
+        const xmp = buildXmpMetadata(email, userId, fingerprint);
+        const xmpStream = pdfDoc.context.stream(xmp, {
+          Type: 'Metadata',
+          Subtype: 'XML',
+        });
+        const xmpRef = pdfDoc.context.register(xmpStream);
+        pdfDoc.catalog.set(PDFName.of('Metadata'), xmpRef);
+      } catch (e) {
+        console.error('Failed to inject XMP metadata:', e);
+      }
 
       const originalFileName = displayName || (path.split('/').pop() || 'document.pdf');
       const fileNameWithoutExt = originalFileName.replace(/\.pdf$/i, '');
@@ -461,6 +491,39 @@ serve(async (req) => {
               page.drawText(emailPrefix, { x: hx, y: hy, size: hiddenFontSize, font, color: rgb(0.92, 0.92, 0.92), opacity: hiddenOpacity });
             }
           }
+        }
+
+        // ── Cryptographic fingerprint trace (nearly-invisible text on every page) ──
+        // Split the fingerprint into chunks and place them at varied low-opacity positions.
+        // Extractable via standard PDF text extraction (pdftotext) for forensic tracing,
+        // but visually imperceptible at normal viewing.
+        try {
+          const chunkCount = 8;
+          const chunkLen = Math.ceil(fingerprint.length / chunkCount);
+          for (let i = 0; i < chunkCount; i++) {
+            const chunk = fingerprint.slice(i * chunkLen, (i + 1) * chunkLen);
+            const fx = ((width - 40) / chunkCount) * i + 5;
+            const fy = 2 + (i % 3) * 2;
+            page.drawText(chunk, {
+              x: fx,
+              y: fy,
+              size: 1,
+              font,
+              color: rgb(1, 1, 1),
+              opacity: 0.01,
+            });
+          }
+          // Full fingerprint at one more location (vertical middle margin)
+          page.drawText(`${fingerprint}|${userId}`, {
+            x: 1,
+            y: height / 2,
+            size: 0.5,
+            font,
+            color: rgb(1, 1, 1),
+            opacity: 0.005,
+          });
+        } catch (e) {
+          console.error('Failed to draw invisible fingerprint trace:', e);
         }
       }
 
