@@ -1417,18 +1417,13 @@ export const FileRequestsManager = () => {
                               </TooltipProvider>
                             )}
                             {request.notes && (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Badge variant="outline" className="text-xs px-1.5 py-0.5 cursor-help">
-                                      <MessageSquare className="w-3 h-3" />
-                                    </Badge>
-                                  </TooltipTrigger>
-                                  <TooltipContent className="max-w-[300px]">
-                                    <p className="whitespace-pre-wrap">{request.notes}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
+                              <Badge 
+                                variant="outline" 
+                                className="text-xs px-1.5 py-0.5 cursor-pointer hover:bg-accent"
+                                onClick={() => setNoteDialogRequest(request)}
+                              >
+                                <MessageSquare className="w-3 h-3" />
+                              </Badge>
                             )}
                             <button
                               onClick={() => handleFilterByUser(request, 'email')}
@@ -1709,7 +1704,12 @@ export const FileRequestsManager = () => {
                         </button>
                       </div>
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">ת.ז: {request.id_number}</span>
+                        <button
+                          onClick={() => handleFilterByUser(request, 'id_number')}
+                          className="text-muted-foreground hover:underline hover:text-primary transition-colors"
+                        >
+                          ת.ז: {request.id_number}
+                        </button>
                         <Badge variant="outline" className="text-xs">{request.course_name}</Badge>
                       </div>
                     </div>
