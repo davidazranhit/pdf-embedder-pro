@@ -126,6 +126,9 @@ export const FileRequestsManager = () => {
   const [isSendingFiles, setIsSendingFiles] = useState(false);
   const [sendProgress, setSendProgress] = useState<{ step: string; percent: number }>({ step: "", percent: 0 });
   
+  // Note dialog state
+  const [noteDialogRequest, setNoteDialogRequest] = useState<FileRequest | null>(null);
+  
   // Bulk selection state
   const [selectedRequestIds, setSelectedRequestIds] = useState<Set<string>>(new Set());
   const [showBulkSendDialog, setShowBulkSendDialog] = useState(false);
@@ -946,6 +949,28 @@ export const FileRequestsManager = () => {
         sendProgress={bulkSendProgress}
       />
 
+      {/* Note Dialog */}
+      <Dialog open={!!noteDialogRequest} onOpenChange={(open) => !open && setNoteDialogRequest(null)}>
+        <DialogContent className="sm:max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-primary" />
+              הערה
+            </DialogTitle>
+            <DialogDescription>
+              {noteDialogRequest?.email} — {noteDialogRequest?.course_name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="bg-accent rounded-lg p-4">
+              <p className="text-accent-foreground whitespace-pre-wrap text-sm leading-relaxed">
+                {noteDialogRequest?.notes}
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* File Selection Dialog */}
       <Dialog
         open={showFileSendDialog}
@@ -1414,18 +1439,13 @@ export const FileRequestsManager = () => {
                               </TooltipProvider>
                             )}
                             {request.notes && (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Badge variant="outline" className="text-xs px-1.5 py-0.5 cursor-help">
-                                      <MessageSquare className="w-3 h-3" />
-                                    </Badge>
-                                  </TooltipTrigger>
-                                  <TooltipContent className="max-w-[300px]">
-                                    <p className="whitespace-pre-wrap">{request.notes}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
+                              <Badge 
+                                variant="outline" 
+                                className="text-xs px-1.5 py-0.5 cursor-pointer hover:bg-accent"
+                                onClick={() => setNoteDialogRequest(request)}
+                              >
+                                <MessageSquare className="w-3 h-3" />
+                              </Badge>
                             )}
                             <button
                               onClick={() => handleFilterByUser(request, 'email')}
@@ -1706,7 +1726,12 @@ export const FileRequestsManager = () => {
                         </button>
                       </div>
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">ת.ז: {request.id_number}</span>
+                        <button
+                          onClick={() => handleFilterByUser(request, 'id_number')}
+                          className="text-muted-foreground hover:underline hover:text-primary transition-colors"
+                        >
+                          ת.ז: {request.id_number}
+                        </button>
                         <Badge variant="outline" className="text-xs">{request.course_name}</Badge>
                       </div>
                     </div>
