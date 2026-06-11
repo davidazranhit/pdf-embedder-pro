@@ -126,6 +126,9 @@ export const FileRequestsManager = () => {
   const [isSendingFiles, setIsSendingFiles] = useState(false);
   const [sendProgress, setSendProgress] = useState<{ step: string; percent: number }>({ step: "", percent: 0 });
   
+  // Note dialog state
+  const [noteDialogRequest, setNoteDialogRequest] = useState<FileRequest | null>(null);
+  
   // Bulk selection state
   const [selectedRequestIds, setSelectedRequestIds] = useState<Set<string>>(new Set());
   const [showBulkSendDialog, setShowBulkSendDialog] = useState(false);
