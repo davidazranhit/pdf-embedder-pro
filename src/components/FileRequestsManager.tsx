@@ -949,6 +949,28 @@ export const FileRequestsManager = () => {
         sendProgress={bulkSendProgress}
       />
 
+      {/* Note Dialog */}
+      <Dialog open={!!noteDialogRequest} onOpenChange={(open) => !open && setNoteDialogRequest(null)}>
+        <DialogContent className="sm:max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-primary" />
+              הערה
+            </DialogTitle>
+            <DialogDescription>
+              {noteDialogRequest?.email} — {noteDialogRequest?.course_name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="bg-accent rounded-lg p-4">
+              <p className="text-accent-foreground whitespace-pre-wrap text-sm leading-relaxed">
+                {noteDialogRequest?.notes}
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* File Selection Dialog */}
       <Dialog
         open={showFileSendDialog}
