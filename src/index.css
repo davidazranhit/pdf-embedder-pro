@@ -8,40 +8,41 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 220 25% 97%;
-    --foreground: 230 20% 15%;
+    /* Cloud White – clean SaaS palette */
+    --background: 210 25% 99%;
+    --foreground: 222 25% 14%;
 
     --card: 0 0% 100%;
-    --card-foreground: 230 20% 15%;
+    --card-foreground: 222 25% 14%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 230 20% 15%;
+    --popover-foreground: 222 25% 14%;
 
-    --primary: 239 84% 62%;
+    --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 270 70% 65%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 215 25% 95%;
+    --secondary-foreground: 222 25% 18%;
 
-    --muted: 220 15% 92%;
-    --muted-foreground: 230 10% 45%;
+    --muted: 215 25% 96%;
+    --muted-foreground: 215 16% 47%;
 
-    --accent: 270 70% 65%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 215 25% 95%;
+    --accent-foreground: 222 25% 18%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 15% 88%;
-    --input: 220 15% 92%;
-    --ring: 239 84% 62%;
+    --border: 215 20% 91%;
+    --input: 215 20% 91%;
+    --ring: 217 91% 60%;
 
-    --radius: 0.75rem;
-    
-    --gradient-primary: linear-gradient(135deg, hsl(239 84% 62%), hsl(270 70% 65%));
-    --gradient-subtle: linear-gradient(180deg, hsl(220 25% 97%), hsl(220 20% 95%));
-    --shadow-card: 0 4px 24px -8px hsl(239 84% 62% / 0.12);
-    --shadow-elevated: 0 8px 32px -12px hsl(239 84% 62% / 0.2);
+    --radius: 0.875rem;
+
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(224 76% 56%));
+    --gradient-subtle: linear-gradient(180deg, hsl(210 25% 99%), hsl(215 25% 96%));
+    --shadow-card: 0 1px 2px hsl(220 25% 20% / 0.04), 0 4px 16px -6px hsl(220 25% 20% / 0.06);
+    --shadow-elevated: 0 4px 8px -2px hsl(220 25% 20% / 0.06), 0 16px 40px -12px hsl(220 25% 20% / 0.12);
 
     --sidebar-background: 0 0% 98%;
 
@@ -111,5 +112,14 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    letter-spacing: -0.015em;
   }
 }

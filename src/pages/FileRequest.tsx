@@ -235,22 +235,22 @@ const FileRequest = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md p-8 space-y-6">
-        <div className="text-center space-y-2">
-          <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
-            <FileText className="w-8 h-8 text-primary" />
+    <div className="min-h-screen bg-gradient-subtle flex items-center justify-center p-4 sm:p-6">
+      <Card className="w-full max-w-md p-6 sm:p-8 space-y-6 shadow-elevated border-border/60 rounded-2xl">
+        <div className="text-center space-y-3">
+          <div className="w-14 h-14 mx-auto bg-primary/10 ring-1 ring-primary/15 rounded-2xl flex items-center justify-center">
+            <FileText className="w-7 h-7 text-primary" />
           </div>
-          <h1 className="text-3xl font-bold text-foreground">{formTitle}</h1>
+          <h1 className="font-heading text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">{formTitle}</h1>
           <div className="text-muted-foreground space-y-2 text-sm max-w-md mx-auto">
-            <p className="whitespace-pre-wrap">{formInstructions}</p>
-            <p className="text-destructive font-semibold">
+            <p className="whitespace-pre-wrap leading-relaxed">{formInstructions}</p>
+            <p className="text-destructive font-medium text-xs sm:text-sm">
               {formWarning}
             </p>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="email">כתובת מייל</Label>
             <Input
