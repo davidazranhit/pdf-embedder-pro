@@ -56,6 +56,58 @@ const FileRequest = () => {
   const [termsOfService, setTermsOfService] = useState<string>("");
   const { toast } = useToast();
 
+  // Capture traffic-source context on first render and persist for the session
+  // so a refresh mid-form does not lose it.
+  const trafficContext = (() => {
+    try {
+      const CACHE_KEY = "traffic_ctx_v1";
+      const cached = sessionStorage.getItem(CACHE_KEY);
+      if (cached) return JSON.parse(cached) as Record<string, string | null>;
+
+      const params = new URLSearchParams(window.location.search);
+      const get = (k: string) => params.get(k)?.trim() || null;
+      const referrer = document.referrer || null;
+
+      // Derive a friendly source label from utm_source, ?src=, ?ref=, or referrer host
+      const explicit = get("utm_source") || get("src") || get("ref");
+      let label = explicit;
+      if (!label && referrer) {
+        try {
+          const host = new URL(referrer).hostname.replace(/^www\./, "");
+          if (/wa\.me|whatsapp/i.test(host)) label = "whatsapp";
+          else if (/(t\.me|telegram)/i.test(host)) label = "telegram";
+          else if (/instagram/i.test(host)) label = "instagram";
+          else if (/facebook|fb\.com|fb\.me/i.test(host)) label = "facebook";
+          else if (/google\./i.test(host)) label = "google";
+          else if (/bing\./i.test(host)) label = "bing";
+          else if (/tiktok/i.test(host)) label = "tiktok";
+          else if (/youtube|youtu\.be/i.test(host)) label = "youtube";
+          else label = host;
+        } catch { /* ignore */ }
+      }
+      if (!label) label = "direct";
+
+      const ctx = {
+        referrer,
+        landing_url: window.location.href,
+        utm_source: get("utm_source"),
+        utm_medium: get("utm_medium"),
+        utm_campaign: get("utm_campaign"),
+        utm_content: get("utm_content"),
+        utm_term: get("utm_term"),
+        traffic_source: label,
+      };
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify(ctx));
+      return ctx;
+    } catch {
+      return {
+        referrer: null, landing_url: null,
+        utm_source: null, utm_medium: null, utm_campaign: null,
+        utm_content: null, utm_term: null, traffic_source: "direct",
+      };
+    }
+  })();
+
   const normalizeEmail = (value: string) => value.trim().toLowerCase();
 
   const normalizeIsraeliId = (value: string) => {
@@ -178,6 +230,14 @@ const FileRequest = () => {
           course_name: normalizedCourseName,
           notes: normalizedNotes || null,
           owner_id: ownerId,
+          referrer: trafficContext.referrer,
+          landing_url: trafficContext.landing_url,
+          utm_source: trafficContext.utm_source,
+          utm_medium: trafficContext.utm_medium,
+          utm_campaign: trafficContext.utm_campaign,
+          utm_content: trafficContext.utm_content,
+          utm_term: trafficContext.utm_term,
+          traffic_source: trafficContext.traffic_source,
         });
 
       if (error) throw error;
