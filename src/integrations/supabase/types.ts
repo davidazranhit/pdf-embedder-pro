@@ -286,13 +286,21 @@ export type Database = {
           email: string
           id: string
           id_number: string
+          landing_url: string | null
           notes: string | null
           owner_id: string | null
+          referrer: string | null
           reminder_sent_at: string | null
           sent_date: string | null
           status: Database["public"]["Enums"]["request_status"]
           submission_date: string
+          traffic_source: string | null
           updated_at: string
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          utm_term: string | null
         }
         Insert: {
           auto_sent?: boolean
@@ -301,13 +309,21 @@ export type Database = {
           email: string
           id?: string
           id_number: string
+          landing_url?: string | null
           notes?: string | null
           owner_id?: string | null
+          referrer?: string | null
           reminder_sent_at?: string | null
           sent_date?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           submission_date?: string
+          traffic_source?: string | null
           updated_at?: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
         }
         Update: {
           auto_sent?: boolean
@@ -316,13 +332,21 @@ export type Database = {
           email?: string
           id?: string
           id_number?: string
+          landing_url?: string | null
           notes?: string | null
           owner_id?: string | null
+          referrer?: string | null
           reminder_sent_at?: string | null
           sent_date?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           submission_date?: string
+          traffic_source?: string | null
           updated_at?: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
         }
         Relationships: []
       }
