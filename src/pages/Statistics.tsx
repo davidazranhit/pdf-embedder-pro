@@ -479,6 +479,10 @@ const Statistics = () => {
               <DownloadLogsViewer />
             </TabsContent>
 
+            <TabsContent value="traffic">
+              <TrafficSourcesTab />
+            </TabsContent>
+
             <TabsContent value="audit">
               <AuditLogViewer />
             </TabsContent>
